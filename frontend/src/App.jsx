@@ -7,7 +7,6 @@ import AppShell from "./components/layout/AppShell";
 import HomePage from "./pages/HomePage";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
 
-// Route guard: redirects to /login if not authenticated
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
