@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Settings, Users, Trash2, UserPlus, Copy, Check, Shield } from "lucide-react";
-import { useWorkspace } from "../../context/WorkspaceContext";
-import { useAuth } from "../../context/AuthContext";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/layout/Sidebar";
 
 const ICONS = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
@@ -197,7 +197,7 @@ const WorkspaceSettings = () => {
               <span className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
                 ${member.role === "owner" ? "bg-amber-500/15 text-amber-400" :
                   member.role === "admin" ? "bg-violet-500/15 text-violet-400" :
-                  "bg-slate-700/60 text-slate-400"}`}>
+                    "bg-slate-700/60 text-slate-400"}`}>
                 {member.role === "owner" && <Shield size={11} />}
                 {member.role}
               </span>
