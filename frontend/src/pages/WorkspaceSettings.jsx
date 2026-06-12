@@ -4,7 +4,7 @@ import { Settings, Users, Trash2, UserPlus, Copy, Check, Shield } from "lucide-r
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/layout/Sidebar";
-
+//icons are mentioned here
 const ICONS = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
 const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
 
