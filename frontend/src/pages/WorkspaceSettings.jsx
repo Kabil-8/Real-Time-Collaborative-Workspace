@@ -33,7 +33,6 @@ const WorkspaceSettings = () => {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Invite form
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
