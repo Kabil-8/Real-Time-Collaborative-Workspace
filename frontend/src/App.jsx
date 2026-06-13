@@ -6,6 +6,9 @@ import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import AppShell from "./components/layout/AppShell";
 import HomePage from "./pages/HomePage";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
+import MembersPage from "./pages/MembersPage";
+import BoardPage from "./pages/BoardPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
 
 // Route guard: redirects to /login if not authenticated
 const PrivateRoute = ({ children }) => {
@@ -36,10 +39,13 @@ const PublicRoute = ({ children }) => {
 };
 
 const AppRoutes = () => (
-  <Routes>
+    <Routes>
     {/* Public */}
     <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+
+    {/* Accept invite — requires auth but not workspace membership yet */}
+    <Route path="/invite/:token" element={<PrivateRoute><AcceptInvitePage /></PrivateRoute>} />
 
     {/* Protected — wrapped in AppShell */}
     <Route path="/" element={
@@ -62,11 +68,32 @@ const AppRoutes = () => (
       </PrivateRoute>
     } />
 
+    {/* Board detail — full Kanban view (no AppShell sidebar needed over board bg) */}
+    <Route path="/boards/:boardId" element={
+      <PrivateRoute>
+        <WorkspaceProvider>
+          <AppShell>
+            <BoardPage />
+          </AppShell>
+        </WorkspaceProvider>
+      </PrivateRoute>
+    } />
+
     <Route path="/workspace/:workspaceId/settings" element={
       <PrivateRoute>
         <WorkspaceProvider>
           <AppShell>
             <WorkspaceSettings />
+          </AppShell>
+        </WorkspaceProvider>
+      </PrivateRoute>
+    } />
+
+    <Route path="/workspace/:workspaceId/members" element={
+      <PrivateRoute>
+        <WorkspaceProvider>
+          <AppShell>
+            <MembersPage />
           </AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
