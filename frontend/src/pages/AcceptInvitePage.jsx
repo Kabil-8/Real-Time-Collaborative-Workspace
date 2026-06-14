@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, ArrowRight } from "lucide-react";
 import api from "../utils/api";
 
 /**
@@ -10,7 +10,7 @@ import api from "../utils/api";
 const AcceptInvitePage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState("loading"); // "loading" | "success" | "error"
+  const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
 
@@ -20,83 +20,98 @@ const AcceptInvitePage = () => {
       setMessage("No invite token provided.");
       return;
     }
-
     api
       .post(`/workspaces/accept-invite/${token}`)
       .then(({ data }) => {
         setWorkspaceName(data.workspace?.name || "the workspace");
         setStatus("success");
-        // Redirect after 2 seconds
-        setTimeout(() => navigate("/"), 2000);
+        setTimeout(() => navigate("/"), 2500);
       })
       .catch((err) => {
-        const msg =
-          err.response?.data?.message ||
-          "This invite link is invalid or has expired.";
-        setMessage(msg);
+        setMessage(err.response?.data?.message || "This invite link is invalid or has expired.");
         setStatus("error");
       });
   }, [token, navigate]);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-      {/* Ambient glow */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-violet-600/10 rounded-full blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 overflow-hidden">
+      {/* Ambient orbs */}
+      <div className="orb orb-violet w-[500px] h-[500px] top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      <div className="orb orb-indigo w-[300px] h-[300px] bottom-1/4 right-1/4" />
 
       <div className="relative w-full max-w-md text-center animate-scale-in">
         {/* Logo */}
-        <div className="inline-flex items-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/30">
+        <div className="inline-flex items-center gap-2.5 mb-10">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600
+            flex items-center justify-center text-white font-black text-xl
+            shadow-lg shadow-violet-500/40 glow-violet-sm">
             Z
           </div>
-          <span className="text-white font-semibold text-xl tracking-tight">Zaalima</span>
+          <span className="text-white font-bold text-xl tracking-tight">Zaalima</span>
         </div>
 
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-10 shadow-2xl">
+        <div className="glass rounded-2xl p-10 shadow-2xl">
+          {/* Loading */}
           {status === "loading" && (
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 size={40} className="text-violet-400 animate-spin" />
-              <p className="text-slate-300 font-medium">Accepting your invitation…</p>
-              <p className="text-slate-500 text-sm">Please wait a moment.</p>
+            <div className="flex flex-col items-center gap-5">
+              <div className="spinner-gradient w-12 h-12"
+                style={{ width: 48, height: 48 }} />
+              <div>
+                <p className="text-white font-semibold text-lg mb-1">Accepting invitation…</p>
+                <p className="text-slate-500 text-sm">Please wait a moment.</p>
+              </div>
             </div>
           )}
 
+          {/* Success */}
           {status === "success" && (
-            <div className="flex flex-col items-center gap-4 animate-fade-in">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 flex items-center justify-center">
-                <CheckCircle size={36} className="text-emerald-400" />
+            <div className="flex flex-col items-center gap-5 animate-fade-in">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20
+                  flex items-center justify-center glow-emerald-sm">
+                  <CheckCircle size={40} className="text-emerald-400" />
+                </div>
+                {/* Ping rings */}
+                <div className="absolute inset-0 rounded-2xl border-2 border-emerald-500/30 animate-ping" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white mb-1">You're in! 🎉</h1>
-                <p className="text-slate-400 text-sm">
-                  You've joined <span className="text-white font-semibold">{workspaceName}</span>.
-                  <br />Redirecting you now…
+                <h1 className="text-2xl font-black text-white mb-2">You're in! 🎉</h1>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  You've joined{" "}
+                  <span className="text-white font-semibold">{workspaceName}</span>.
+                  <br />Redirecting you to your workspace…
                 </p>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-1 overflow-hidden mt-2">
-                <div className="h-1 bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full animate-[progress_2s_linear_forwards]"
-                  style={{ animation: "width 2s linear forwards", width: "0%" }}
+              {/* Progress bar */}
+              <div className="w-full bg-slate-800/60 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-1.5 rounded-full animate-progress"
+                  style={{
+                    background: "linear-gradient(90deg, #7c3aed, #34d399)",
+                    animationDuration: "2.5s",
+                  }}
                 />
               </div>
             </div>
           )}
 
+          {/* Error */}
           {status === "error" && (
-            <div className="flex flex-col items-center gap-4 animate-fade-in">
-              <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center">
-                <XCircle size={36} className="text-red-400" />
+            <div className="flex flex-col items-center gap-5 animate-fade-in">
+              <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/20
+                flex items-center justify-center">
+                <XCircle size={40} className="text-red-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white mb-1">Invite Failed</h1>
+                <h1 className="text-2xl font-black text-white mb-2">Invite Failed</h1>
                 <p className="text-slate-400 text-sm">{message}</p>
               </div>
               <button
                 onClick={() => navigate("/")}
-                className="mt-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
+                className="btn-primary"
               >
                 Go to dashboard
+                <ArrowRight size={14} />
               </button>
             </div>
           )}

@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Plus, X, ArrowLeft, Star, Settings2, Loader2, Users } from "lucide-react";
+import {
+  Plus, X, ArrowLeft, Star, Loader2, Users, List, MoreHorizontal
+} from "lucide-react";
 import api from "../utils/api";
 import ListColumn from "../components/board/ListColumn";
 import { useAuth } from "../context/AuthContext";
 
-// ─── Add-list form (inline at the end of the board) ──────────────────────────
+// ─── Add-list form ────────────────────────────────────────────────────────────
 const AddListForm = ({ boardId, onListAdded }) => {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -32,17 +34,18 @@ const AddListForm = ({ boardId, onListAdded }) => {
       <button
         onClick={() => setOpen(true)}
         className="flex-shrink-0 w-72 h-12 flex items-center gap-2.5 px-4 rounded-2xl
-          bg-slate-800/40 hover:bg-slate-800/70 border border-dashed border-slate-700
-          hover:border-slate-600 text-slate-500 hover:text-slate-300 transition-all text-sm font-medium"
+          bg-white/5 hover:bg-white/10 border border-dashed border-white/20
+          hover:border-white/30 text-white/50 hover:text-white/80
+          transition-all duration-200 text-sm font-medium group backdrop-blur-sm"
       >
-        <Plus size={16} />
+        <Plus size={16} className="transition-transform group-hover:rotate-90 duration-200" />
         Add another list
       </button>
     );
   }
 
   return (
-    <div className="flex-shrink-0 w-72 bg-slate-900/70 border border-slate-800/60 rounded-2xl p-3 animate-scale-in">
+    <div className="flex-shrink-0 w-72 glass-dark rounded-2xl p-3 animate-scale-in">
       <form onSubmit={handleSubmit} className="space-y-2">
         <input
           autoFocus
@@ -50,22 +53,22 @@ const AddListForm = ({ boardId, onListAdded }) => {
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
           placeholder="List name…"
-          className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white
-            text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all"
+          className="input-field text-sm"
         />
         <div className="flex gap-2">
           <button
             type="submit"
             disabled={loading || !title.trim()}
-            className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs
-              font-semibold disabled:opacity-50 transition-colors"
+            className="flex-1 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600
+              hover:from-violet-500 hover:to-indigo-500 text-white text-xs
+              font-semibold disabled:opacity-50 transition-all"
           >
             {loading ? "Adding…" : "Add list"}
           </button>
           <button
             type="button"
             onClick={() => { setOpen(false); setTitle(""); }}
-            className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-2 rounded-xl bg-white/10 text-white/60 hover:text-white transition-colors"
           >
             <X size={14} />
           </button>
@@ -76,7 +79,7 @@ const AddListForm = ({ boardId, onListAdded }) => {
 };
 
 // ─── Board header ─────────────────────────────────────────────────────────────
-const BoardHeader = ({ board, onBack }) => {
+const BoardHeader = ({ board, onBack, listCount }) => {
   const [starred, setStarred] = useState(board?.isStarred || false);
 
   const toggleStar = async () => {
@@ -89,34 +92,49 @@ const BoardHeader = ({ board, onBack }) => {
   };
 
   return (
-    <div className="flex items-center gap-3 px-6 py-3 border-b border-black/20 backdrop-blur-sm bg-black/10 flex-shrink-0">
+    <div className="flex items-center gap-3 px-5 py-3 border-b border-white/10
+      bg-black/20 backdrop-blur-md flex-shrink-0">
+      {/* Back */}
       <button
         onClick={onBack}
-        className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-all"
+        className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20
+          text-white/70 hover:text-white transition-all"
         title="Back to home"
       >
         <ArrowLeft size={16} />
       </button>
 
-      <h1 className="text-base font-bold text-white flex-1 truncate">
-        {board?.title || "Board"}
-      </h1>
+      {/* Divider */}
+      <span className="w-px h-5 bg-white/15" />
 
-      <button
-        onClick={toggleStar}
-        className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-all"
-        title={starred ? "Unstar board" : "Star board"}
-      >
-        <Star size={16} className={starred ? "fill-yellow-300 text-yellow-300" : ""} />
-      </button>
+      {/* Title */}
+      <h1 className="text-sm font-bold text-white flex-1 truncate">{board?.title || "Board"}</h1>
 
-      {/* Member count pill */}
+      {/* List count pill */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10
+        text-white/70 text-xs font-medium">
+        <List size={11} />
+        {listCount} lists
+      </div>
+
+      {/* Member count */}
       {board?.members?.length > 0 && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-white/80 text-xs font-medium">
-          <Users size={12} />
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10
+          text-white/70 text-xs font-medium">
+          <Users size={11} />
           {board.members.length}
         </div>
       )}
+
+      {/* Star */}
+      <button
+        onClick={toggleStar}
+        className={`p-1.5 rounded-xl transition-all
+          ${starred ? "bg-yellow-400/20 text-yellow-300" : "bg-white/10 text-white/50 hover:text-yellow-300 hover:bg-yellow-400/15"}`}
+        title={starred ? "Unstar board" : "Star board"}
+      >
+        <Star size={15} className={starred ? "fill-yellow-300" : ""} />
+      </button>
     </div>
   );
 };
@@ -132,7 +150,6 @@ const BoardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch board details + lists
   const loadBoard = useCallback(async () => {
     if (!boardId) return;
     setLoading(true);
@@ -151,22 +168,13 @@ const BoardPage = () => {
     }
   }, [boardId]);
 
-  useEffect(() => {
-    loadBoard();
-  }, [loadBoard]);
+  useEffect(() => { loadBoard(); }, [loadBoard]);
 
-  // Called by AddListForm when a list is created
-  const handleListAdded = (newList) => {
+  const handleListAdded   = (newList) =>
     setLists((prev) => [...prev, { ...newList, cardOrder: [] }]);
-  };
-
-  // Called by ListColumn when a list is archived
-  const handleListDeleted = (listId) => {
+  const handleListDeleted = (listId) =>
     setLists((prev) => prev.filter((l) => l._id !== listId));
-  };
-
-  // Called by ListColumn when a card is added
-  const handleCardAdded = (listId, newCard) => {
+  const handleCardAdded   = (listId, newCard) =>
     setLists((prev) =>
       prev.map((l) =>
         l._id === listId
@@ -174,30 +182,31 @@ const BoardPage = () => {
           : l
       )
     );
-  };
 
-  // Loading state
+  // Loading
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={32} className="text-violet-400 animate-spin" />
+      <div className="flex-1 flex items-center justify-center bg-slate-950 h-full">
+        <div className="flex flex-col items-center gap-4">
+          <div className="spinner-gradient" />
           <p className="text-slate-500 text-sm">Loading board…</p>
         </div>
       </div>
     );
   }
 
-  // Error state
+  // Error
   if (error || !board) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center py-20 animate-fade-in">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-3xl mb-4">🗂️</div>
-        <h3 className="text-lg font-semibold text-white mb-2">Board not found</h3>
+        <div className="w-16 h-16 rounded-2xl glass flex items-center justify-center text-3xl mb-4">
+          🗂️
+        </div>
+        <h3 className="text-lg font-bold text-white mb-2">Board not found</h3>
         <p className="text-slate-500 text-sm mb-6">{error || "This board doesn't exist or you don't have access."}</p>
         <button
           onClick={() => navigate("/")}
-          className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all"
+          className="btn-primary"
         >
           Back to home
         </button>
@@ -208,17 +217,27 @@ const BoardPage = () => {
   const bg = board.background?.value || "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
 
   return (
-    <div className="flex flex-col h-full" style={{ background: bg }}>
-      {/* Subtle dark overlay to keep text readable */}
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+    <div className="flex flex-col h-full relative" style={{ background: bg }}>
+      {/* Gradient mesh overlay */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.40) 100%)"
+        }}
+      />
+      {/* Noise texture */}
+      <div className="absolute inset-0 pointer-events-none opacity-30"
+        style={{
+          backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.1'/%3E%3C/svg%3E\")"
+        }}
+      />
 
       <div className="relative flex flex-col h-full">
         {/* Board header */}
-        <BoardHeader board={board} onBack={() => navigate("/")} />
+        <BoardHeader board={board} onBack={() => navigate("/")} listCount={lists.length} />
 
-        {/* Kanban columns — horizontal scroll */}
+        {/* Kanban columns */}
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-4 p-6 h-full items-start">
+          <div className="flex gap-4 p-6 h-full items-start min-w-max">
             {lists.map((list) => (
               <ListColumn
                 key={list._id}
@@ -226,14 +245,9 @@ const BoardPage = () => {
                 boardId={boardId}
                 onCardAdded={handleCardAdded}
                 onListDeleted={handleListDeleted}
-                onCardClick={(card) => {
-                  // Future: open card detail modal
-                  console.log("Card clicked:", card.title);
-                }}
+                onCardClick={(card) => console.log("Card clicked:", card.title)}
               />
             ))}
-
-            {/* Add list form */}
             <AddListForm boardId={boardId} onListAdded={handleListAdded} />
           </div>
         </div>

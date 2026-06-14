@@ -10,24 +10,36 @@ import MembersPage from "./pages/MembersPage";
 import BoardPage from "./pages/BoardPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 
+// ─── Branded loading screen ───────────────────────────────────────────────────
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden">
+    {/* Ambient orbs */}
+    <div className="orb orb-violet w-96 h-96 top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2" />
+    <div className="orb orb-indigo w-72 h-72 bottom-1/4 right-1/4" />
+    <div className="flex flex-col items-center gap-5 relative z-10 animate-scale-in">
+      {/* Logo mark */}
+      <div className="relative">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600
+          flex items-center justify-center text-white font-black text-2xl
+          shadow-lg shadow-violet-500/40 glow-violet-sm">
+          Z
+        </div>
+        {/* Spinning ring */}
+        <div className="absolute -inset-2 rounded-full border-2 border-transparent
+          border-t-violet-500 border-r-indigo-500 animate-spin opacity-60" />
+      </div>
+      <div className="text-center">
+        <p className="text-white font-semibold text-lg tracking-tight">Zaalima</p>
+        <p className="text-slate-500 text-sm mt-0.5 animate-pulse-dot">Loading your workspace…</p>
+      </div>
+    </div>
+  </div>
+);
+
 // Route guard: redirects to /login if not authenticated
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600
-            flex items-center justify-center text-white font-bold text-lg animate-pulse">
-            Z
-          </div>
-          <p className="text-slate-500 text-sm">Loading…</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return <LoadingScreen />;
   return user ? children : <Navigate to="/login" replace />;
 };
 
@@ -39,9 +51,9 @@ const PublicRoute = ({ children }) => {
 };
 
 const AppRoutes = () => (
-    <Routes>
+  <Routes>
     {/* Public */}
-    <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+    <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
     {/* Accept invite — requires auth but not workspace membership yet */}
@@ -51,9 +63,7 @@ const AppRoutes = () => (
     <Route path="/" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell>
-            <HomePage />
-          </AppShell>
+          <AppShell><HomePage /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -61,20 +71,15 @@ const AppRoutes = () => (
     <Route path="/boards" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell>
-            <HomePage />
-          </AppShell>
+          <AppShell><HomePage /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
 
-    {/* Board detail — full Kanban view (no AppShell sidebar needed over board bg) */}
     <Route path="/boards/:boardId" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell>
-            <BoardPage />
-          </AppShell>
+          <AppShell><BoardPage /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -82,9 +87,7 @@ const AppRoutes = () => (
     <Route path="/workspace/:workspaceId/settings" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell>
-            <WorkspaceSettings />
-          </AppShell>
+          <AppShell><WorkspaceSettings /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -92,9 +95,7 @@ const AppRoutes = () => (
     <Route path="/workspace/:workspaceId/members" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell>
-            <MembersPage />
-          </AppShell>
+          <AppShell><MembersPage /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
