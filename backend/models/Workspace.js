@@ -55,7 +55,6 @@ const inviteSchema = new mongoose.Schema(
   },
   { _id: false }
 );
-
 const workspaceSchema = new mongoose.Schema(
   {
     name: {
