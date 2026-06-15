@@ -6,6 +6,7 @@ import {
 import api from "../utils/api";
 import ListColumn from "../components/board/ListColumn";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 // ─── Add-list form ────────────────────────────────────────────────────────────
 const AddListForm = ({ boardId, onListAdded }) => {
@@ -80,6 +81,7 @@ const AddListForm = ({ boardId, onListAdded }) => {
 
 // ─── Board header ─────────────────────────────────────────────────────────────
 const BoardHeader = ({ board, onBack, listCount }) => {
+  const { isDark } = useTheme();
   const [starred, setStarred] = useState(board?.isStarred || false);
 
   const toggleStar = async () => {
@@ -92,45 +94,48 @@ const BoardHeader = ({ board, onBack, listCount }) => {
   };
 
   return (
-    <div className="flex items-center gap-3 px-5 py-3 border-b border-white/10
-      bg-black/20 backdrop-blur-md flex-shrink-0">
-      {/* Back */}
+    <div
+      className="flex items-center gap-3 px-5 py-3 flex-shrink-0"
+      style={{
+        borderBottom: isDark ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(0,0,0,0.08)",
+        background: isDark ? "rgba(0,0,0,0.20)" : "rgba(255,255,255,0.85)",
+        backdropFilter: "blur(16px)",
+      }}
+    >
       <button
         onClick={onBack}
-        className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20
-          text-white/70 hover:text-white transition-all"
+        className="p-1.5 rounded-xl transition-all"
+        style={{
+          background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
+          color: isDark ? "rgba(255,255,255,0.70)" : "#374151",
+        }}
         title="Back to home"
       >
         <ArrowLeft size={16} />
       </button>
-
-      {/* Divider */}
-      <span className="w-px h-5 bg-white/15" />
-
-      {/* Title */}
-      <h1 className="text-sm font-bold text-white flex-1 truncate">{board?.title || "Board"}</h1>
-
-      {/* List count pill */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10
-        text-white/70 text-xs font-medium">
+      <span className="w-px h-5" style={{ background: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.10)" }} />
+      <h1 className="text-sm font-bold flex-1 truncate" style={{ color: isDark ? "#fff" : "#111827" }}>{board?.title || "Board"}</h1>
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+        style={{ background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)", color: isDark ? "rgba(255,255,255,0.70)" : "#6b7280" }}>
         <List size={11} />
         {listCount} lists
       </div>
-
-      {/* Member count */}
       {board?.members?.length > 0 && (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10
-          text-white/70 text-xs font-medium">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+          style={{ background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)", color: isDark ? "rgba(255,255,255,0.70)" : "#6b7280" }}>
           <Users size={11} />
           {board.members.length}
         </div>
       )}
-
-      {/* Star */}
       <button
         onClick={toggleStar}
-        className={`p-1.5 rounded-xl transition-all
-          ${starred ? "bg-yellow-400/20 text-yellow-300" : "bg-white/10 text-white/50 hover:text-yellow-300 hover:bg-yellow-400/15"}`}
+        className="p-1.5 rounded-xl transition-all"
+        style={{
+          background: starred
+            ? "rgba(234,179,8,0.20)"
+            : isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
+          color: starred ? "#fde047" : isDark ? "rgba(255,255,255,0.50)" : "#9ca3af",
+        }}
         title={starred ? "Unstar board" : "Star board"}
       >
         <Star size={15} className={starred ? "fill-yellow-300" : ""} />
@@ -144,6 +149,7 @@ const BoardPage = () => {
   const { boardId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isDark } = useTheme();
 
   const [board, setBoard] = useState(null);
   const [lists, setLists] = useState([]);
@@ -215,13 +221,19 @@ const BoardPage = () => {
   }
 
   const bg = board.background?.value || "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+  // In light mode: soften the board background with a light overlay
+  const boardBg = isDark
+    ? bg
+    : "linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 50%, #e0f2fe 100%)";
 
   return (
-    <div className="flex flex-col h-full relative" style={{ background: bg }}>
-      {/* Gradient mesh overlay */}
+    <div className="flex flex-col h-full relative" style={{ background: boardBg }}>
+      {/* Overlay — lighter in light mode */}
       <div className="absolute inset-0 pointer-events-none"
         style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.40) 100%)"
+          background: isDark
+            ? "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.40) 100%)"
+            : "linear-gradient(to bottom, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.05) 100%)"
         }}
       />
       {/* Noise texture */}

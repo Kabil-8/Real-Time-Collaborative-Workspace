@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Bell, Command, ChevronRight } from "lucide-react";
 import Sidebar, { Avatar } from "./Sidebar";
 import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal";
+import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
 
@@ -90,18 +91,21 @@ const AppShell = ({ children }) => {
             </button>
 
             {/* Notification bell */}
-            <button className="relative p-2 rounded-lg text-slate-500 hover:text-slate-300
-              hover:bg-slate-800/60 transition-all">
+            <button className="relative p-2 rounded-xl text-slate-500 hover:text-slate-300
+              hover:bg-slate-800/60 dark:hover:bg-slate-800/60 transition-all">
               <Bell size={16} />
               {/* Notification dot */}
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-violet-500
-                border-2 border-slate-950">
+                border-2 border-slate-950 dark:border-slate-950">
                 <span className="absolute inset-0 rounded-full bg-violet-400 animate-ping opacity-75" />
               </span>
             </button>
 
-            {/* User avatar */}
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+            {/* Theme toggle */}
+            <ThemeToggle />
+
+            {/* Divider + User avatar */}
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-800 dark:border-slate-800">
               <Avatar user={user} size="sm" online />
             </div>
           </div>

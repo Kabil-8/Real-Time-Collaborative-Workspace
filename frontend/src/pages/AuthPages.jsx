@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, ArrowRight, Zap, Users, Shield, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import ThemeToggle from "../components/layout/ThemeToggle";
 
 // ─── Floating shape ───────────────────────────────────────────────────────────
 const FloatingShape = ({ className, delay = 0 }) => (
@@ -125,6 +126,11 @@ const AuthShell = ({ title, subtitle, children, isLogin }) => (
 
     {/* RIGHT — Form panel */}
     <div className="flex-1 flex items-center justify-center px-6 py-12 relative">
+      {/* Theme toggle — top right corner */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle className="border border-slate-700/40 bg-slate-800/40 backdrop-blur-sm" />
+      </div>
+
       {/* Ambient glow */}
       <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full
         bg-violet-600/5 blur-3xl pointer-events-none" />

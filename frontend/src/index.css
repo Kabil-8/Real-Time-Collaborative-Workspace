@@ -5,69 +5,157 @@
 @tailwind utilities;
 
 /* ══════════════════════════════════════════════════════════════════
-   BASE LAYER — Force dark inputs/selects/textareas
+   BASE LAYER — Theme-aware form elements & transitions
 ══════════════════════════════════════════════════════════════════ */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
   html { scroll-behavior: smooth; }
 
+  /* Smooth theme transitions on key properties */
+  body, header, aside, main, section, div, button, input, textarea, select, nav, p, span, a {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, box-shadow 0.25s ease;
+  }
+
   body {
     margin: 0;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: #020617;
-    color: #f1f5f9;
+    background: var(--color-bg);
+    color: var(--color-text);
   }
 
-  /* Force all form elements to be dark */
-  input, textarea, select {
+  /* Dark mode form elements */
+  html.dark input, html.dark textarea, html.dark select {
     background-color: rgba(15, 23, 42, 0.70) !important;
     color: #f1f5f9;
     border: 1px solid rgba(148, 163, 184, 0.12);
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  input::placeholder,
-  textarea::placeholder {
+  html.dark input::placeholder,
+  html.dark textarea::placeholder {
     color: #475569;
   }
 
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
+  /* Light mode form elements */
+  html.light input, html.light textarea, html.light select {
+    background-color: rgba(255, 255, 255, 0.90) !important;
+    color: #1e293b;
+    border: 1px solid rgba(100, 116, 139, 0.25);
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  html.light input::placeholder,
+  html.light textarea::placeholder {
+    color: #94a3b8;
+  }
+
+  /* Autofill — dark */
+  html.dark input:-webkit-autofill,
+  html.dark input:-webkit-autofill:hover,
+  html.dark input:-webkit-autofill:focus,
+  html.dark input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.95) inset !important;
     -webkit-text-fill-color: #f1f5f9 !important;
     caret-color: #f1f5f9;
     transition: background-color 5000s ease-in-out 0s;
   }
 
-  select option {
+  /* Autofill — light */
+  html.light input:-webkit-autofill,
+  html.light input:-webkit-autofill:hover,
+  html.light input:-webkit-autofill:focus,
+  html.light input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px rgba(248, 250, 252, 0.98) inset !important;
+    -webkit-text-fill-color: #1e293b !important;
+    caret-color: #1e293b;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  html.dark select option {
     background: #0f172a;
     color: #f1f5f9;
+  }
+
+  html.light select option {
+    background: #ffffff;
+    color: #1e293b;
   }
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   CSS DESIGN TOKENS
+   CSS DESIGN TOKENS — Dark (default)
 ══════════════════════════════════════════════════════════════════ */
 :root {
+  /* Backgrounds */
   --color-bg:          #020617;
   --color-surface:     #0f172a;
   --color-surface-2:   #1e293b;
-  --color-border:      rgba(148,163,184,0.08);
+  --color-surface-3:   #334155;
 
+  /* Text */
+  --color-text:        #f1f5f9;
+  --color-text-muted:  #94a3b8;
+  --color-text-subtle: #475569;
+
+  /* Borders */
+  --color-border:      rgba(148,163,184,0.08);
+  --color-border-md:   rgba(148,163,184,0.14);
+
+  /* Brand */
   --color-violet:      #7c3aed;
   --color-indigo:      #4f46e5;
 
+  /* Glows */
   --glow-violet:  0 0 40px rgba(124,58,237,0.25), 0 0 80px rgba(124,58,237,0.10);
   --glow-emerald: 0 0 30px rgba(52,211,153,0.20);
 
+  /* Radii & blur */
   --radius-card: 16px;
   --radius-btn:  12px;
   --blur-glass: 18px;
+
+  /* Glass tint */
+  --glass-bg: rgba(15,23,42,0.65);
+  --glass-border: rgba(255,255,255,0.06);
+
+  /* Skeleton */
+  --skeleton-from: rgba(30,41,59,0.60);
+  --skeleton-mid:  rgba(51,65,85,0.80);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CSS DESIGN TOKENS — Light overrides
+══════════════════════════════════════════════════════════════════ */
+html.light {
+  /* Backgrounds */
+  --color-bg:          #f1f5f9;
+  --color-surface:     #ffffff;
+  --color-surface-2:   #e2e8f0;
+  --color-surface-3:   #cbd5e1;
+
+  /* Text */
+  --color-text:        #0f172a;
+  --color-text-muted:  #475569;
+  --color-text-subtle: #64748b;
+
+  /* Borders */
+  --color-border:      rgba(100,116,139,0.14);
+  --color-border-md:   rgba(100,116,139,0.22);
+
+  /* Glows stay vibrant */
+  --glow-violet:  0 0 40px rgba(124,58,237,0.18), 0 0 80px rgba(124,58,237,0.07);
+  --glow-emerald: 0 0 30px rgba(52,211,153,0.15);
+
+  /* Glass tint — frosted white */
+  --glass-bg: rgba(255,255,255,0.70);
+  --glass-border: rgba(100,116,139,0.15);
+
+  /* Skeleton */
+  --skeleton-from: rgba(226,232,240,0.80);
+  --skeleton-mid:  rgba(203,213,225,0.90);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -76,10 +164,10 @@
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(100,116,139,0.35);
+  background: var(--color-surface-3);
   border-radius: 99px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.60); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-subtle); }
 
 /* ══════════════════════════════════════════════════════════════════
    FOCUS RING
@@ -96,10 +184,10 @@
 
 /* Glass morphism */
 .glass {
-  background: rgba(15,23,42,0.65);
+  background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-glass));
   -webkit-backdrop-filter: blur(var(--blur-glass));
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--glass-border);
 }
 
 .glass-dark {
@@ -107,6 +195,12 @@
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Light-mode glass override */
+html.light .glass-dark {
+  background: rgba(255,255,255,0.65);
+  border: 1px solid rgba(100,116,139,0.15);
 }
 
 /* Gradient text */
@@ -172,7 +266,7 @@
   padding: 0.5rem 0.875rem;
   border-radius: 10px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
   font-weight: 500;
   border: none;
@@ -181,11 +275,11 @@
   font-family: inherit;
 }
 .btn-ghost:hover {
-  background: rgba(148,163,184,0.08);
-  color: #e2e8f0;
+  background: var(--color-border-md);
+  color: var(--color-text);
 }
 
-/* ── INPUT FIELD (dark, styled) ─────────────────────────────────── */
+/* ── INPUT FIELD (theme-aware) ─────────────────────────────────── */
 .input-field {
   width: 100%;
   padding: 0.75rem 1rem;
@@ -216,6 +310,19 @@
   background-position: right 0.75rem center;
   padding-right: 2.5rem;
   cursor: pointer;
+}
+
+/* Light mode overrides for input-field */
+html.light .input-field {
+  background: rgba(248,250,252,0.95) !important;
+  border: 1px solid rgba(100,116,139,0.22) !important;
+  color: #1e293b !important;
+}
+html.light .input-field::placeholder { color: #94a3b8 !important; }
+html.light .input-field:focus {
+  border-color: rgba(124,58,237,0.50) !important;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.10), 0 0 20px rgba(124,58,237,0.06) !important;
+  background: #ffffff !important;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -294,9 +401,9 @@
 .skeleton {
   background: linear-gradient(
     90deg,
-    rgba(30,41,59,0.60) 25%,
-    rgba(51,65,85,0.80) 50%,
-    rgba(30,41,59,0.60) 75%
+    var(--skeleton-from) 25%,
+    var(--skeleton-mid)  50%,
+    var(--skeleton-from) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -335,18 +442,96 @@
   left: calc(100% + 8px);
   top: 50%;
   transform: translateY(-50%);
-  background: #1e293b;
-  color: #cbd5e1;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
   padding: 0.375rem 0.625rem;
   border-radius: 8px;
-  border: 1px solid rgba(148,163,184,0.10);
+  border: 1px solid var(--color-border-md);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   z-index: 100;
 }
 .tooltip:hover::after { opacity: 1; }
+
+/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+   LIGHT MODE \u2014 Professional clean overrides
+   Pure whites, proper dark text, no dark shades.
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+
+/* \u2500 Page shell backgrounds \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light body { background: #f4f6fb; }
+html.light .min-h-full { background: transparent; }
+html.light .bg-slate-950  { background-color: #f4f6fb !important; }
+html.light .bg-slate-900  { background-color: #f8fafc !important; }
+html.light .bg-slate-950\/90 { background-color: rgba(255,255,255,0.94) !important; }
+
+/* \u2500 Sidebar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light aside { background-color: #ffffff !important; box-shadow: 1px 0 0 rgba(0,0,0,0.07) !important; }
+html.light aside .bg-slate-800\/40 { background-color: rgba(241,245,249,0.80) !important; }
+html.light aside .bg-slate-800\/70 { background-color: rgba(230,235,243,0.90) !important; }
+html.light aside .bg-slate-800\/60 { background-color: rgba(241,245,249,0.80) !important; }
+html.light aside .bg-slate-800\/50 { background-color: rgba(241,245,249,0.70) !important; }
+html.light aside .border-slate-800 { border-color: rgba(0,0,0,0.07) !important; }
+html.light aside .border-slate-800\/40 { border-color: rgba(0,0,0,0.06) !important; }
+html.light aside .border-slate-700\/40 { border-color: rgba(0,0,0,0.06) !important; }
+/* Active nav item */
+html.light aside .bg-violet-500\/15 { background-color: rgba(124,58,237,0.09) !important; }
+/* Section labels */
+html.light aside .text-slate-600 { color: #9ca3af !important; }
+
+/* \u2500 Top header bar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light header { background-color: rgba(255,255,255,0.94) !important; border-bottom: 1px solid rgba(0,0,0,0.07) !important; }
+html.light header .bg-slate-800\/60 { background-color: rgba(241,245,249,0.80) !important; }
+html.light header .border-slate-700\/50 { border-color: rgba(0,0,0,0.10) !important; }
+html.light header .border-slate-800 { border-color: rgba(0,0,0,0.08) !important; }
+html.light header .border-slate-700 { border-color: rgba(0,0,0,0.08) !important; }
+/* Notification dot border */
+html.light .border-slate-950 { border-color: #ffffff !important; }
+
+/* \u2500 Text colors \u2014 all get proper dark contrast \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .text-white          { color: #111827 !important; }
+html.light .text-slate-100      { color: #1f2937 !important; }
+html.light .text-slate-200      { color: #374151 !important; }
+html.light .text-slate-300      { color: #4b5563 !important; }
+html.light .text-slate-400      { color: #6b7280 !important; }
+html.light .text-slate-500      { color: #9ca3af !important; }
+html.light .text-slate-600      { color: #9ca3af !important; }
+/* Keep violet accents vivid */
+html.light .text-violet-400     { color: #7c3aed !important; }
+html.light .text-violet-300     { color: #6d28d9 !important; }
+html.light .text-emerald-400    { color: #059669 !important; }
+
+/* \u2500 Borders \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .border-slate-800    { border-color: rgba(0,0,0,0.07) !important; }
+html.light .border-slate-800\/40 { border-color: rgba(0,0,0,0.06) !important; }
+html.light .border-slate-700    { border-color: rgba(0,0,0,0.09) !important; }
+html.light .border-slate-700\/40 { border-color: rgba(0,0,0,0.06) !important; }
+html.light .border-slate-700\/50 { border-color: rgba(0,0,0,0.08) !important; }
+
+/* \u2500 Workspace switcher dropdown \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .glass     { background: rgba(255,255,255,0.96) !important; border: 1px solid rgba(0,0,0,0.08) !important; box-shadow: 0 8px 30px rgba(0,0,0,0.10) !important; }
+html.light .glass-dark { background: rgba(255,255,255,0.96) !important; border: 1px solid rgba(0,0,0,0.08) !important; }
+html.light aside .text-slate-300 { color: #374151 !important; }
+html.light aside .hover\:bg-slate-800\/60:hover { background-color: rgba(124,58,237,0.08) !important; }
+
+/* \u2500 Breadcrumb \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .text-slate-700 { color: #d1d5db !important; }
+
+/* \u2500 Ambient orbs \u2014 softer pastels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .orb-violet  { background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%); }
+html.light .orb-indigo  { background: radial-gradient(circle, rgba(79,70,229,0.06) 0%, transparent 70%); }
+html.light .orb-emerald { background: radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%); }
+
+/* \u2500 New board / create board card border \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .border-slate-700\/60 { border-color: rgba(124,58,237,0.20) !important; }
+html.light .border-dashed.border-slate-700 { border-color: rgba(124,58,237,0.25) !important; }
+
+/* \u2500 Loading screen \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+html.light .min-h-screen { background-color: #f4f6fb !important; }
+
+

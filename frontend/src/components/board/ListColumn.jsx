@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus, X, MoreHorizontal, Trash2 } from "lucide-react";
 import CardItem from "./CardItem";
 import api from "../../utils/api";
+import { useTheme } from "../../context/ThemeContext";
 
 // Column accent colors by index
 const COLUMN_COLORS = [
@@ -19,6 +20,7 @@ const COLUMN_COLORS = [
  * ListColumn — frosted-glass Kanban column with colored accent border
  */
 const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, index = 0 }) => {
+  const { isDark } = useTheme();
   const [showAddCard, setShowAddCard] = useState(false);
   const [cardTitle, setCardTitle]     = useState("");
   const [creating, setCreating]       = useState(false);
@@ -63,14 +65,19 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
 
   return (
     <div
-      className="flex-shrink-0 w-72 flex flex-col rounded-2xl max-h-full animate-slide-in
-        overflow-hidden"
+      className="flex-shrink-0 w-72 flex flex-col rounded-2xl max-h-full animate-slide-in overflow-hidden"
       style={{
-        background: "rgba(2, 6, 23, 0.55)",
+        background: isDark
+          ? "rgba(2, 6, 23, 0.55)"
+          : "rgba(255, 255, 255, 0.88)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        boxShadow: "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)",
+        border: isDark
+          ? "1px solid rgba(255,255,255,0.07)"
+          : "1px solid rgba(0,0,0,0.07)",
+        boxShadow: isDark
+          ? "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)"
+          : "0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05)",
       }}
     >
       {/* Top accent bar */}
@@ -83,16 +90,17 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
           className="w-2 h-2 rounded-full flex-shrink-0"
           style={{ backgroundColor: accentColor, boxShadow: `0 0 6px ${accentColor}88` }}
         />
-        <h3 className="flex-1 text-sm font-bold text-white/90 truncate">{list.title}</h3>
+        <h3 className="flex-1 text-sm font-bold truncate" style={{ color: isDark ? "rgba(255,255,255,0.90)" : "#111827" }}>{list.title}</h3>
 
         {/* Card count */}
         <span
           className={`min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold
             flex items-center justify-center transition-colors
-            ${atWip
-              ? "bg-red-500/20 text-red-400"
-              : "bg-white/10 text-white/50"
-            }`}
+            ${atWip ? "bg-red-500/20 text-red-400" : ""}`}
+          style={atWip ? {} : {
+            background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)",
+            color: isDark ? "rgba(255,255,255,0.50)" : "#6b7280",
+          }}
         >
           {cards.length}
         </span>
@@ -101,8 +109,8 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
         <div className="relative">
           <button
             onClick={() => setShowMenu((o) => !o)}
-            className="p-1.5 rounded-lg text-white/30 hover:text-white/70
-              hover:bg-white/10 transition-all"
+            className="p-1.5 rounded-lg transition-all"
+            style={{ color: isDark ? "rgba(255,255,255,0.30)" : "#9ca3af" }}
           >
             <MoreHorizontal size={14} />
           </button>
@@ -111,22 +119,23 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
               <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
               <div
                 className="absolute top-full right-0 mt-1 w-44 rounded-xl overflow-hidden z-30
-                  animate-scale-in shadow-2xl shadow-black/60"
+                  animate-scale-in shadow-2xl"
                 style={{
-                  background: "rgba(15,23,42,0.95)",
-                  border: "1px solid rgba(148,163,184,0.10)",
+                  background: isDark ? "rgba(15,23,42,0.95)" : "#ffffff",
+                  border: isDark ? "1px solid rgba(148,163,184,0.10)" : "1px solid rgba(0,0,0,0.10)",
                   backdropFilter: "blur(12px)",
+                  boxShadow: isDark ? "0 20px 60px rgba(0,0,0,0.60)" : "0 8px 30px rgba(0,0,0,0.12)",
                 }}
               >
                 <button
                   onClick={() => { setShowAddCard(true); setShowMenu(false); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300
-                    hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                  style={{ color: isDark ? "#cbd5e1" : "#374151" }}
                 >
                   <Plus size={14} className="text-violet-400" />
                   Add a card
                 </button>
-                <div className="border-t border-white/5" />
+                <div style={{ borderTop: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.06)" }} />
                 <button
                   onClick={() => { handleDeleteList(); setShowMenu(false); }}
                   disabled={deleting}
@@ -162,10 +171,11 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
         ))}
         {cards.length === 0 && !showAddCard && (
           <div className="py-6 flex flex-col items-center justify-center text-center">
-            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-2">
-              <Plus size={14} className="text-white/20" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
+              style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}>
+              <Plus size={14} style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }} />
             </div>
-            <p className="text-xs text-white/20">No cards yet</p>
+            <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>No cards yet</p>
           </div>
         )}
       </div>
@@ -184,11 +194,11 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
               }}
               placeholder="Card title…"
               rows={2}
-              className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-white/30
-                resize-none transition-all outline-none focus:ring-2 focus:ring-violet-500/60"
+              className="w-full px-3 py-2.5 rounded-xl text-sm resize-none transition-all outline-none focus:ring-2 focus:ring-violet-500/60"
               style={{
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.04)",
+                border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
+                color: isDark ? "#fff" : "#111827",
               }}
             />
             <div className="flex gap-2">
@@ -204,7 +214,11 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
               <button
                 type="button"
                 onClick={() => { setShowAddCard(false); setCardTitle(""); }}
-                className="p-2 rounded-xl bg-white/10 text-white/50 hover:text-white transition-colors"
+                className="p-2 rounded-xl transition-colors"
+                style={{
+                  background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.06)",
+                  color: isDark ? "rgba(255,255,255,0.60)" : "#6b7280",
+                }}
               >
                 <X size={14} />
               </button>
@@ -214,7 +228,8 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
           <button
             onClick={() => setShowAddCard(true)}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm
-              text-white/30 hover:text-white/70 hover:bg-white/8 transition-all group"
+              transition-all group"
+            style={{ color: isDark ? "rgba(255,255,255,0.30)" : "#9ca3af" }}
           >
             <Plus size={14} className="transition-transform group-hover:rotate-90 duration-200" />
             Add a card

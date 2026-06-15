@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspace } from "../context/WorkspaceContext";
+import { useTheme } from "../context/ThemeContext";
 import api from "../utils/api";
 
 const GRADIENTS = [
@@ -104,31 +105,46 @@ const CreateBoardCard = ({ onClick }) => (
 );
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-const StatCard = ({ icon: Icon, label, value, gradient, delay = 0, sub }) => (
-  <div
-    className="relative rounded-2xl p-6 overflow-hidden animate-count-up"
-    style={{
-      background: "rgba(15,23,42,0.70)",
-      border: "1px solid rgba(255,255,255,0.06)",
-      backdropFilter: "blur(12px)",
-      animationDelay: `${delay}ms`,
-    }}
-  >
-    {/* Gradient bg */}
-    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: gradient }} />
-    <div className="relative flex items-start gap-4">
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: gradient }}>
-        <Icon size={20} className="text-white" />
-      </div>
-      <div>
-        <p className="text-3xl font-black text-white leading-none mb-1">{value}</p>
-        <p className="text-sm font-semibold text-slate-300">{label}</p>
-        {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+const StatCard = ({ icon: Icon, label, value, gradient, delay = 0, sub, lightBg }) => {
+  const { isDark } = useTheme();
+  return (
+    <div
+      className="relative rounded-2xl p-5 overflow-hidden animate-count-up"
+      style={{
+        background: isDark
+          ? "rgba(15,23,42,0.70)"
+          : lightBg || "#ffffff",
+        border: isDark
+          ? "1px solid rgba(255,255,255,0.06)"
+          : "none",
+        backdropFilter: isDark ? "blur(12px)" : "none",
+        boxShadow: isDark
+          ? "none"
+          : "0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06)",
+        animationDelay: `${delay}ms`,
+      }}
+    >
+      {/* Dark mode subtle gradient tint */}
+      {isDark && <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: gradient }} />}
+      <div className="relative flex items-start gap-4">
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{
+            background: isDark ? gradient : `${gradient.match(/#[0-9a-f]{6}/i)?.[0] || "#7c3aed"}18`,
+            boxShadow: isDark ? "none" : `0 4px 14px ${gradient.match(/#[0-9a-f]{6}/i)?.[0] || "#7c3aed"}30`,
+          }}
+        >
+          <Icon size={19} style={{ color: isDark ? "#fff" : (gradient.match(/#[0-9a-f]{6}/i)?.[0] || "#7c3aed") }} />
+        </div>
+        <div>
+          <p className="text-3xl font-black leading-none mb-1" style={{ color: isDark ? "#fff" : "#0f172a" }}>{value}</p>
+          <p className="text-sm font-semibold" style={{ color: isDark ? "#cbd5e1" : "#374151" }}>{label}</p>
+          {sub && <p className="text-xs mt-0.5" style={{ color: isDark ? "#64748b" : "#9ca3af" }}>{sub}</p>}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Live clock ───────────────────────────────────────────────────────────────
 const useClock = () => {
@@ -139,6 +155,7 @@ const useClock = () => {
 
 // ─── Home Page ────────────────────────────────────────────────────────────────
 const HomePage = () => {
+  const { isDark } = useTheme();
   const { user } = useAuth();
   const { activeWorkspace, fetchWorkspaces } = useWorkspace();
   const navigate = useNavigate();
@@ -192,10 +209,14 @@ const HomePage = () => {
       <div
         className="relative overflow-hidden"
         style={{
-          background: activeWorkspace?.color
-            ? `linear-gradient(135deg, ${activeWorkspace.color}1a 0%, rgba(2,6,23,0) 60%)`
-            : "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(2,6,23,0) 60%)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          background: isDark
+            ? (activeWorkspace?.color
+                ? `linear-gradient(135deg, ${activeWorkspace.color}1a 0%, rgba(2,6,23,0) 60%)`
+                : "linear-gradient(135deg, rgba(124,58,237,0.12) 0%, rgba(2,6,23,0) 60%)")
+            : (activeWorkspace?.color
+                ? `linear-gradient(135deg, ${activeWorkspace.color}15 0%, rgba(248,250,252,0) 60%)`
+                : "linear-gradient(135deg, rgba(124,58,237,0.07) 0%, rgba(248,250,252,0) 60%)"),
+          borderBottom: isDark ? "1px solid rgba(255,255,255,0.04)" : "1px solid rgba(100,116,139,0.12)",
         }}
       >
         <div className="orb orb-violet w-[500px] h-[500px] -top-32 -left-20 opacity-40" />
@@ -209,14 +230,14 @@ const HomePage = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-dot" />
                 {dateStr}
               </p>
-              <h1 className="text-4xl font-black text-white leading-tight mb-2">
+              <h1 className="text-4xl font-black leading-tight mb-2" style={{ color: isDark ? "#fff" : "#0f172a" }}>
                 {greeting},{" "}
                 <span className="gradient-text">{firstName}</span>{" "}
                 <span className="text-3xl">{emoji}</span>
               </h1>
-              <p className="text-slate-400 text-base">
+              <p className="text-base" style={{ color: isDark ? "#94a3b8" : "#475569" }}>
                 {activeWorkspace
-                  ? <>You're working in <span className="text-white font-bold">{activeWorkspace.name}</span></>
+                  ? <>You're working in <strong style={{ color: isDark ? "#fff" : "#0f172a" }}>{activeWorkspace.name}</strong></>
                   : "Create or select a workspace to get started."}
               </p>
             </div>
@@ -224,10 +245,16 @@ const HomePage = () => {
             {/* Clock */}
             <div
               className="rounded-2xl px-6 py-4 text-right animate-fade-in flex-shrink-0"
-              style={{ background: "rgba(15,23,42,0.70)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}
+              style={{
+                background: isDark ? "rgba(15,23,42,0.70)" : "#ffffff",
+                border: isDark ? "1px solid rgba(255,255,255,0.06)" : "none",
+                backdropFilter: isDark ? "blur(12px)" : "none",
+                boxShadow: isDark ? "none" : "0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06)",
+              }}
             >
-              <p className="text-3xl font-mono font-black text-white tracking-tight">{timeStr}</p>
-              <p className="text-xs text-slate-500 mt-1">{dateStr}</p>
+              {!isDark && <div className="w-8 h-1 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 ml-auto mb-2" />}
+              <p className="text-3xl font-mono font-black tracking-tight" style={{ color: isDark ? "#fff" : "#0f172a" }}>{timeStr}</p>
+              <p className="text-xs mt-1" style={{ color: isDark ? "#64748b" : "#9ca3af" }}>{dateStr}</p>
             </div>
           </div>
         </div>
@@ -244,16 +271,19 @@ const HomePage = () => {
                 icon={Trello}    label="Boards"       value={boards.length}
                 gradient="linear-gradient(135deg, #7c3aed, #4f46e5)" delay={0}
                 sub="Total boards in workspace"
+                lightBg="linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)"
               />
               <StatCard
                 icon={Users}     label="Members"      value={activeWorkspace.members?.length || 0}
                 gradient="linear-gradient(135deg, #0ea5e9, #6366f1)" delay={80}
                 sub="Active collaborators"
+                lightBg="linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)"
               />
               <StatCard
                 icon={Activity}  label="Activity"     value="Live"
                 gradient="linear-gradient(135deg, #10b981, #059669)" delay={160}
                 sub="Real-time collaboration"
+                lightBg="linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
               />
             </div>
 
@@ -266,8 +296,8 @@ const HomePage = () => {
                     <Trello size={16} className="text-violet-400" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-white">Your Boards</h2>
-                    <p className="text-xs text-slate-500">{boards.length} board{boards.length !== 1 ? "s" : ""}</p>
+                    <h2 className="text-lg font-black" style={{ color: isDark ? "#fff" : "#0f172a" }}>Your Boards</h2>
+                    <p className="text-xs" style={{ color: isDark ? "#64748b" : "#64748b" }}>{boards.length} board{boards.length !== 1 ? "s" : ""}</p>
                   </div>
                 </div>
                 <button
@@ -300,16 +330,16 @@ const HomePage = () => {
                       onSubmit={handleCreateBoard}
                       className="h-44 rounded-2xl p-4 flex flex-col gap-3 animate-scale-in"
                       style={{
-                        background: "rgba(15,23,42,0.80)",
-                        border: "1px solid rgba(124,58,237,0.30)",
+                        background: isDark ? "rgba(15,23,42,0.90)" : "rgba(255,255,255,0.98)",
+                        border: "1px solid rgba(124,58,237,0.35)",
                         backdropFilter: "blur(12px)",
-                        boxShadow: "0 0 30px rgba(124,58,237,0.10)",
+                        boxShadow: isDark ? "0 0 30px rgba(124,58,237,0.10)" : "0 8px 30px rgba(124,58,237,0.12)",
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">New Board</span>
+                        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: isDark ? "#94a3b8" : "#475569" }}>New Board</span>
                         <button type="button" onClick={() => setShowCreateBoard(false)}
-                          className="p-1 rounded-lg text-slate-600 hover:text-slate-400 transition-colors">
+                          className="p-1 rounded-lg transition-colors" style={{ color: isDark ? "#475569" : "#94a3b8" }}>
                           <X size={13} />
                         </button>
                       </div>
@@ -337,40 +367,46 @@ const HomePage = () => {
 
             {/* ── Quick links ───────────────────────────────────────── */}
             <div className="animate-fade-in">
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Quick access</h3>
+              <h3 className="text-sm font-bold uppercase tracking-widest mb-4" style={{ color: isDark ? "#64748b" : "#9ca3af" }}>Quick access</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { label: "Members",  desc: "Manage team & roles",         icon: Users,     path: `/workspace/${activeWorkspace._id}/members`,  color: "#6366f1" },
-                  { label: "Settings", desc: "Workspace configuration",      icon: Sparkles,  path: `/workspace/${activeWorkspace._id}/settings`,  color: "#8b5cf6" },
-                  { label: "Activity", desc: "Recent workspace activity",    icon: BarChart3, path: "/",                                          color: "#10b981" },
-                ].map(({ label, desc, icon: Icon, path, color }) => (
+                  { label: "Members",  desc: "Manage team & roles",         icon: Users,     path: `/workspace/${activeWorkspace._id}/members`,  color: "#6366f1", lightBg: "#f5f3ff" },
+                  { label: "Settings", desc: "Workspace configuration",      icon: Sparkles,  path: `/workspace/${activeWorkspace._id}/settings`,  color: "#8b5cf6", lightBg: "#faf5ff" },
+                  { label: "Activity", desc: "Recent workspace activity",    icon: BarChart3, path: "/",                                          color: "#10b981", lightBg: "#f0fdf4" },
+                ].map(({ label, desc, icon: Icon, path, color, lightBg }) => (
                   <button key={label} onClick={() => navigate(path)}
                     className="flex items-center gap-4 p-4 rounded-2xl text-left group
                       transition-all duration-200 hover:scale-[1.02]"
                     style={{
-                      background: "rgba(15,23,42,0.60)",
-                      border: "1px solid rgba(255,255,255,0.05)",
-                      backdropFilter: "blur(12px)",
+                      background: isDark ? "rgba(15,23,42,0.60)" : lightBg,
+                      border: isDark ? "1px solid rgba(255,255,255,0.05)" : `1px solid ${color}25`,
+                      backdropFilter: isDark ? "blur(12px)" : "none",
+                      boxShadow: isDark ? "none" : `0 1px 3px rgba(0,0,0,0.04), 0 4px 12px ${color}10`,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = `${color}40`;
-                      e.currentTarget.style.boxShadow = `0 8px 30px rgba(0,0,0,0.30)`;
+                      e.currentTarget.style.borderColor = isDark ? `${color}50` : `${color}60`;
+                      e.currentTarget.style.boxShadow = isDark
+                        ? `0 8px 30px rgba(0,0,0,0.30)`
+                        : `0 8px 24px ${color}22`;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.boxShadow = "none";
+                      e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.05)" : `${color}25`;
+                      e.currentTarget.style.boxShadow = isDark ? "none" : `0 1px 3px rgba(0,0,0,0.04), 0 4px 12px ${color}10`;
                     }}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${color}20`, border: `1px solid ${color}30` }}>
+                      style={{
+                        background: isDark ? `${color}20` : `${color}15`,
+                        border: `1px solid ${color}30`,
+                      }}>
                       <Icon size={17} style={{ color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white">{label}</p>
-                      <p className="text-xs text-slate-500 truncate">{desc}</p>
+                      <p className="text-sm font-bold" style={{ color: isDark ? "#fff" : "#111827" }}>{label}</p>
+                      <p className="text-xs truncate" style={{ color: isDark ? "#64748b" : "#6b7280" }}>{desc}</p>
                     </div>
-                    <ChevronRight size={15} className="text-slate-600 group-hover:text-slate-400
-                      group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight size={15} style={{ color: isDark ? "#475569" : color }}
+                      className="group-hover:translate-x-0.5 transition-all opacity-60 group-hover:opacity-100" />
                   </button>
                 ))}
               </div>
@@ -382,7 +418,11 @@ const HomePage = () => {
             <div className="relative mb-8">
               <div
                 className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl"
-                style={{ background: "rgba(15,23,42,0.80)", border: "1px solid rgba(255,255,255,0.07)" }}
+                style={{
+                  background: isDark ? "rgba(15,23,42,0.80)" : "rgba(255,255,255,0.90)",
+                  border: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid rgba(100,116,139,0.15)",
+                  boxShadow: isDark ? "none" : "0 4px 20px rgba(0,0,0,0.08)",
+                }}
               >
                 🏢
               </div>
@@ -394,11 +434,11 @@ const HomePage = () => {
               {/* Glow */}
               <div className="absolute inset-0 rounded-3xl blur-2xl bg-violet-500/10 -z-10 scale-150" />
             </div>
-            <h3 className="text-2xl font-black text-white mb-3">No workspace yet</h3>
-            <p className="text-slate-400 text-base mb-2 max-w-sm leading-relaxed">
+            <h3 className="text-2xl font-black mb-3" style={{ color: isDark ? "#fff" : "#0f172a" }}>No workspace yet</h3>
+            <p className="text-base mb-2 max-w-sm leading-relaxed" style={{ color: isDark ? "#94a3b8" : "#475569" }}>
               Create a workspace to start organizing your team's work with powerful Kanban boards.
             </p>
-            <p className="text-slate-600 text-sm flex items-center gap-2">
+            <p className="text-sm flex items-center gap-2" style={{ color: isDark ? "#475569" : "#94a3b8" }}>
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse-dot" />
               Click the workspace switcher in the sidebar to get started
             </p>

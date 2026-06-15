@@ -1,5 +1,6 @@
 import React from "react";
 import { Clock, Flag, MessageSquare, Paperclip } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 
 const PRIORITY_CONFIG = {
   critical: {
@@ -42,6 +43,7 @@ const formatDate   = (date) =>
  * CardItem — glass-morphism Kanban card with priority glow and date warning
  */
 const CardItem = ({ card, onClick }) => {
+  const { isDark } = useTheme();
   const priority  = card.priority || "none";
   const cfg       = PRIORITY_CONFIG[priority];
   const overdue   = isOverdue(card.dueDate);
@@ -56,20 +58,21 @@ const CardItem = ({ card, onClick }) => {
       className="group relative rounded-xl cursor-pointer transition-all duration-200
         hover:-translate-y-0.5 animate-fade-in overflow-hidden"
       style={{
-        background: "rgba(15,23,42,0.70)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        boxShadow: "0 2px 12px rgba(0,0,0,0.25)",
+        background: isDark ? "rgba(15,23,42,0.70)" : "#ffffff",
+        border: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid rgba(0,0,0,0.07)",
+        backdropFilter: isDark ? "blur(8px)" : "none",
+        WebkitBackdropFilter: isDark ? "blur(8px)" : "none",
+        boxShadow: isDark ? "0 2px 12px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow =
-          `0 8px 30px rgba(0,0,0,0.40), 0 0 0 1px rgba(124,58,237,0.20)${cfg ? `, ${cfg.glow}` : ""}`;
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+        e.currentTarget.style.boxShadow = isDark
+          ? `0 8px 30px rgba(0,0,0,0.40), 0 0 0 1px rgba(124,58,237,0.20)${cfg ? `, ${cfg.glow}` : ""}`
+          : `0 8px 24px rgba(0,0,0,0.10), 0 0 0 1px rgba(124,58,237,0.15)${cfg ? `, ${cfg.glow}` : ""}`;
+        e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(124,58,237,0.20)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.25)";
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+        e.currentTarget.style.boxShadow = isDark ? "0 2px 12px rgba(0,0,0,0.25)" : "0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)";
+        e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)";
       }}
     >
       {/* Cover color strip */}
@@ -95,9 +98,10 @@ const CardItem = ({ card, onClick }) => {
         )}
 
         {/* Title */}
-        <p className={`text-sm font-medium text-white/90 leading-snug mb-2.5
-          group-hover:text-white transition-colors
+        <p className={`text-sm font-medium leading-snug mb-2.5
+          group-hover:text-violet-600 transition-colors
           ${card.coverColor ? "mt-1" : ""}`}
+          style={{ color: isDark ? "rgba(255,255,255,0.90)" : "#111827" }}
         >
           {card.title}
         </p>
@@ -120,12 +124,16 @@ const CardItem = ({ card, onClick }) => {
           {card.dueDate && (
             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px]
               font-medium border transition-colors
-              ${overdue
-                ? "bg-red-500/20 text-red-400 border-red-500/25"
-                : nearDue
-                  ? "bg-amber-500/20 text-amber-400 border-amber-500/25"
-                  : "bg-white/8 text-white/40 border-white/10"
+              ${
+                overdue
+                  ? "bg-red-500/20 text-red-500 border-red-500/25"
+                  : nearDue
+                    ? "bg-amber-500/20 text-amber-600 border-amber-500/25"
+                    : isDark
+                      ? "border-white/10 bg-white/8"
+                      : "border-slate-200 bg-slate-100"
               }`}
+              style={!overdue && !nearDue ? { color: isDark ? "rgba(255,255,255,0.40)" : "#6b7280" } : {}}
             >
               <Clock size={8} />
               {formatDate(card.dueDate)}

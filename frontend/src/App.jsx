@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import AppShell from "./components/layout/AppShell";
 import HomePage from "./pages/HomePage";
@@ -106,11 +107,13 @@ const AppRoutes = () => (
 );
 
 const App = () => (
-  <BrowserRouter>
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
-  </BrowserRouter>
+  <ThemeProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  </ThemeProvider>
 );
 
 export default App;
