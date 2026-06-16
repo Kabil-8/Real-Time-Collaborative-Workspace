@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import api from "../utils/api";
 import ListColumn from "../components/board/ListColumn";
+import CardDetailModal from "../components/board/CardDetailModal";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
@@ -151,10 +152,11 @@ const BoardPage = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
 
-  const [board, setBoard] = useState(null);
-  const [lists, setLists] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [board, setBoard]       = useState(null);
+  const [lists, setLists]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState("");
+  const [activeCardId, setActiveCardId] = useState(null);
 
   const loadBoard = useCallback(async () => {
     if (!boardId) return;
@@ -188,6 +190,40 @@ const BoardPage = () => {
           : l
       )
     );
+
+  /* Called by CardDetailModal when a card is updated / archived / duplicated */
+  const handleCardUpdated = (updatedCard, action) => {
+    if (action === "duplicate") {
+      // Append duplicated card to its list
+      setLists((prev) =>
+        prev.map((l) =>
+          l._id === updatedCard.list
+            ? { ...l, cardOrder: [...(l.cardOrder || []), updatedCard] }
+            : l
+        )
+      );
+      return;
+    }
+    if (updatedCard.isArchived) {
+      // Remove archived card from all lists
+      setLists((prev) =>
+        prev.map((l) => ({
+          ...l,
+          cardOrder: (l.cardOrder || []).filter((c) => c._id !== updatedCard._id),
+        }))
+      );
+      return;
+    }
+    // Generic update — patch the card in place
+    setLists((prev) =>
+      prev.map((l) => ({
+        ...l,
+        cardOrder: (l.cardOrder || []).map((c) =>
+          c._id === updatedCard._id ? { ...c, ...updatedCard } : c
+        ),
+      }))
+    );
+  };
 
   // Loading
   if (loading) {
@@ -250,20 +286,30 @@ const BoardPage = () => {
         {/* Kanban columns */}
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 p-6 h-full items-start min-w-max">
-            {lists.map((list) => (
+            {lists.map((list, idx) => (
               <ListColumn
                 key={list._id}
                 list={list}
                 boardId={boardId}
+                index={idx}
                 onCardAdded={handleCardAdded}
                 onListDeleted={handleListDeleted}
-                onCardClick={(card) => console.log("Card clicked:", card.title)}
+                onCardClick={(card) => setActiveCardId(card._id)}
               />
             ))}
             <AddListForm boardId={boardId} onListAdded={handleListAdded} />
           </div>
         </div>
       </div>
+
+      {/* Card Detail Modal */}
+      {activeCardId && (
+        <CardDetailModal
+          cardId={activeCardId}
+          onClose={() => setActiveCardId(null)}
+          onCardUpdated={handleCardUpdated}
+        />
+      )}
     </div>
   );
 };

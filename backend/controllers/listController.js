@@ -1,7 +1,21 @@
 const { body } = require("express-validator");
-const List = require("../models/List");
+const List  = require("../models/List");
+const Card  = require("../models/Card");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Verify the requesting user is a member of the board that owns the list */
+const assertBoardMember = async (boardId, userId) => {
+  const board = await Board.findById(boardId);
+  if (!board || board.isArchived) return { error: "Board not found.", status: 404 };
+  const isMember = board.members.some(
+    (m) => m.user.toString() === userId.toString()
+  );
+  if (!isMember) return { error: "Access denied.", status: 403 };
+  return { board };
+};
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -14,6 +28,17 @@ exports.createListValidation = [
     .notEmpty().withMessage("boardId is required"),
 ];
 
+exports.updateListValidation = [
+  body("title")
+    .optional()
+    .trim()
+    .notEmpty().withMessage("Title cannot be empty")
+    .isLength({ max: 100 }).withMessage("Title must be 100 characters or fewer"),
+  body("wipLimit")
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage("WIP limit must be a positive integer"),
+];
+
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
 /**
@@ -24,10 +49,8 @@ exports.createList = async (req, res, next) => {
   try {
     const { title, boardId, color } = req.body;
 
-    const board = await Board.findById(boardId);
-    if (!board || board.isArchived) {
-      return errorResponse(res, "Board not found.", 404);
-    }
+    const { error, status, board } = await assertBoardMember(boardId, req.user._id);
+    if (error) return errorResponse(res, error, status);
 
     // Determine next position
     const count = await List.countDocuments({ board: boardId, isArchived: false });
@@ -54,27 +77,50 @@ exports.createList = async (req, res, next) => {
 
 /**
  * GET /api/lists/board/:boardId
- * Get all lists for a board (ordered by position)
+ * Get all (active) lists for a board, ordered by position, with cards populated
  */
 exports.getListsByBoard = async (req, res, next) => {
   try {
     const { boardId } = req.params;
 
-    const board = await Board.findById(boardId);
-    if (!board || board.isArchived) {
-      return errorResponse(res, "Board not found.", 404);
-    }
+    const { error, status } = await assertBoardMember(boardId, req.user._id);
+    if (error) return errorResponse(res, error, status);
 
     const lists = await List.find({ board: boardId, isArchived: false })
       .sort({ position: 1 })
       .populate({
         path: "cardOrder",
         match: { isArchived: false },
-        select: "title priority dueDate assignees coverColor labels position",
+        select: "title priority dueDate assignees coverColor labels position checklists comments attachments",
         populate: { path: "assignees", select: "name avatar avatarColor" },
+        options: { sort: { position: 1 } },
       });
 
     return successResponse(res, { lists });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/lists/:listId
+ * Get a single list with its cards
+ */
+exports.getList = async (req, res, next) => {
+  try {
+    const list = await List.findById(req.params.listId).populate({
+      path: "cardOrder",
+      match: { isArchived: false },
+      select: "title priority dueDate assignees coverColor labels position",
+      populate: { path: "assignees", select: "name avatar avatarColor" },
+    });
+
+    if (!list || list.isArchived) return errorResponse(res, "List not found.", 404);
+
+    const { error, status } = await assertBoardMember(list.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
+
+    return successResponse(res, { list });
   } catch (err) {
     next(err);
   }
@@ -86,20 +132,24 @@ exports.getListsByBoard = async (req, res, next) => {
  */
 exports.updateList = async (req, res, next) => {
   try {
+    const list = await List.findById(req.params.listId);
+    if (!list || list.isArchived) return errorResponse(res, "List not found.", 404);
+
+    const { error, status } = await assertBoardMember(list.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
+
     const allowed = ["title", "color", "wipLimit"];
     const updates = {};
     allowed.forEach((k) => {
       if (req.body[k] !== undefined) updates[k] = req.body[k];
     });
 
-    const list = await List.findByIdAndUpdate(req.params.listId, updates, {
+    const updated = await List.findByIdAndUpdate(req.params.listId, updates, {
       new: true,
       runValidators: true,
     });
 
-    if (!list) return errorResponse(res, "List not found.", 404);
-
-    return successResponse(res, { list }, "List updated.");
+    return successResponse(res, { list: updated }, "List updated.");
   } catch (err) {
     next(err);
   }
@@ -107,7 +157,7 @@ exports.updateList = async (req, res, next) => {
 
 /**
  * PATCH /api/lists/:listId/move
- * Reorder a list within its board (update position)
+ * Reorder a list within its board (update position index)
  */
 exports.moveList = async (req, res, next) => {
   try {
@@ -117,14 +167,18 @@ exports.moveList = async (req, res, next) => {
     }
 
     const list = await List.findById(req.params.listId);
-    if (!list) return errorResponse(res, "List not found.", 404);
+    if (!list || list.isArchived) return errorResponse(res, "List not found.", 404);
+
+    const { error, status, board } = await assertBoardMember(list.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
 
     const boardId = list.board;
-    const lists = await List.find({ board: boardId, isArchived: false }).sort({ position: 1 });
+    const lists   = await List.find({ board: boardId, isArchived: false }).sort({ position: 1 });
 
-    // Remove the list from its current index and insert at newPosition
+    // Remove current, splice at new index
     const filtered = lists.filter((l) => l._id.toString() !== list._id.toString());
-    filtered.splice(newPosition, 0, list);
+    const clamped  = Math.min(newPosition, filtered.length);
+    filtered.splice(clamped, 0, list);
 
     // Re-assign sequential positions
     await Promise.all(
@@ -145,16 +199,22 @@ exports.moveList = async (req, res, next) => {
 
 /**
  * DELETE /api/lists/:listId
- * Archive a list
+ * Soft-archive a list (and its cards)
  */
 exports.archiveList = async (req, res, next) => {
   try {
-    const list = await List.findByIdAndUpdate(
-      req.params.listId,
-      { isArchived: true },
-      { new: true }
-    );
+    const list = await List.findById(req.params.listId);
     if (!list) return errorResponse(res, "List not found.", 404);
+
+    const { error, status } = await assertBoardMember(list.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
+
+    // Archive the list itself
+    list.isArchived = true;
+    await list.save();
+
+    // Archive all cards in the list
+    await Card.updateMany({ list: list._id }, { isArchived: true });
 
     // Remove from board's listOrder
     await Board.findByIdAndUpdate(list.board, {
@@ -163,6 +223,109 @@ exports.archiveList = async (req, res, next) => {
     });
 
     return successResponse(res, {}, "List archived.");
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PATCH /api/lists/:listId/restore
+ * Restore an archived list (and its cards)
+ */
+exports.restoreList = async (req, res, next) => {
+  try {
+    const list = await List.findById(req.params.listId);
+    if (!list) return errorResponse(res, "List not found.", 404);
+
+    const { error, status, board } = await assertBoardMember(list.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
+
+    list.isArchived = false;
+    // Re-assign position at end
+    const count = await List.countDocuments({ board: list.board, isArchived: false });
+    list.position = count;
+    await list.save();
+
+    // Restore cards that belong to this list
+    await Card.updateMany({ list: list._id }, { isArchived: false });
+
+    // Append to board.listOrder
+    board.listOrder.push(list._id);
+    board.lastActivity = new Date();
+    await board.save();
+
+    return successResponse(res, { list }, "List restored.");
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/lists/:listId/duplicate
+ * Duplicate a list (creates new list + copies all active cards)
+ */
+exports.duplicateList = async (req, res, next) => {
+  try {
+    const source = await List.findById(req.params.listId);
+    if (!source || source.isArchived) return errorResponse(res, "List not found.", 404);
+
+    const { error, status, board } = await assertBoardMember(source.board, req.user._id);
+    if (error) return errorResponse(res, error, status);
+
+    // Count active lists for new position
+    const count = await List.countDocuments({ board: source.board, isArchived: false });
+
+    const newList = await List.create({
+      title: `${source.title} (copy)`,
+      board: source.board,
+      workspace: source.workspace,
+      createdBy: req.user._id,
+      position: count,
+      color: source.color,
+      wipLimit: source.wipLimit,
+    });
+
+    // Fetch source cards and duplicate them
+    const sourceCards = await Card.find({ list: source._id, isArchived: false }).sort({ position: 1 });
+    const newCardIds  = [];
+
+    for (let i = 0; i < sourceCards.length; i++) {
+      const sc = sourceCards[i];
+      const newCard = await Card.create({
+        title: sc.title,
+        description: sc.description,
+        list: newList._id,
+        board: sc.board,
+        workspace: sc.workspace,
+        createdBy: req.user._id,
+        position: i,
+        priority: sc.priority,
+        dueDate: sc.dueDate,
+        coverColor: sc.coverColor,
+        assignees: sc.assignees,
+        labels: sc.labels,
+        checklists: sc.checklists.map((cl) => ({
+          title: cl.title,
+          items: cl.items.map((item) => ({ text: item.text, completed: false })),
+        })),
+      });
+      newCardIds.push(newCard._id);
+    }
+
+    newList.cardOrder = newCardIds;
+    await newList.save();
+
+    board.listOrder.push(newList._id);
+    board.lastActivity = new Date();
+    await board.save();
+
+    const populated = await List.findById(newList._id).populate({
+      path: "cardOrder",
+      select: "title priority dueDate assignees coverColor labels position",
+      populate: { path: "assignees", select: "name avatar avatarColor" },
+    });
+
+    return successResponse(res, { list: populated }, "List duplicated.", 201);
   } catch (err) {
     next(err);
   }
