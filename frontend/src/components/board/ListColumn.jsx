@@ -1,8 +1,9 @@
-import React, { useState } from "react";
-import { Plus, X, MoreHorizontal, Trash2 } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Plus, X, MoreHorizontal, Trash2, Copy, Edit3, Gauge } from "lucide-react";
 import CardItem from "./CardItem";
-import api from "../../utils/api";
 import { useTheme } from "../../context/ThemeContext";
+import { archiveList, updateList, duplicateList } from "../../utils/listsApi";
+import { createCard } from "../../utils/cardsApi";
 
 // Column accent colors by index
 const COLUMN_COLORS = [
@@ -17,31 +18,52 @@ const COLUMN_COLORS = [
 ];
 
 /**
- * ListColumn — frosted-glass Kanban column with colored accent border
+ * ListColumn — frosted-glass Kanban column with full CRUD via REST APIs
+ * Features: add card, rename, set WIP limit, duplicate, archive list
  */
-const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, index = 0 }) => {
+const ListColumn = ({
+  list,
+  boardId,
+  onCardAdded,
+  onListDeleted,
+  onListUpdated,
+  onListDuplicated,
+  onCardClick,
+  index = 0,
+}) => {
   const { isDark } = useTheme();
   const [showAddCard, setShowAddCard] = useState(false);
-  const [cardTitle, setCardTitle]     = useState("");
-  const [creating, setCreating]       = useState(false);
-  const [showMenu, setShowMenu]       = useState(false);
-  const [deleting, setDeleting]       = useState(false);
+  const [cardTitle,   setCardTitle]   = useState("");
+  const [creating,    setCreating]    = useState(false);
+  const [showMenu,    setShowMenu]    = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+
+  // Rename state
+  const [renaming,    setRenaming]    = useState(false);
+  const [renameVal,   setRenameVal]   = useState(list.title);
+  const renameRef = useRef(null);
+
+  // WIP limit state
+  const [editWip,  setEditWip]  = useState(false);
+  const [wipVal,   setWipVal]   = useState(list.wipLimit ?? "");
 
   const accentColor = list.color || COLUMN_COLORS[index % COLUMN_COLORS.length];
   const cards = list.cardOrder || [];
   const atWip = list.wipLimit && cards.length >= list.wipLimit;
 
+  /* ── Add Card ── */
   const handleAddCard = async (e) => {
     e.preventDefault();
     if (!cardTitle.trim()) return;
     setCreating(true);
     try {
-      const { data } = await api.post("/cards", {
+      const card = await createCard({
         title: cardTitle.trim(),
         listId: list._id,
         boardId,
       });
-      onCardAdded?.(list._id, data.card);
+      onCardAdded?.(list._id, card);
       setCardTitle("");
       setShowAddCard(false);
     } catch (err) {
@@ -51,11 +73,12 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
     }
   };
 
+  /* ── Archive List ── */
   const handleDeleteList = async () => {
-    if (!window.confirm(`Archive the list "${list.title}"?`)) return;
+    if (!window.confirm(`Archive the list "${list.title}" and all its cards?`)) return;
     setDeleting(true);
     try {
-      await api.delete(`/lists/${list._id}`);
+      await archiveList(list._id);
       onListDeleted?.(list._id);
     } catch (err) {
       console.error("Failed to archive list:", err);
@@ -63,25 +86,92 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
     }
   };
 
+  /* ── Rename List ── */
+  const startRename = () => {
+    setRenameVal(list.title);
+    setRenaming(true);
+    setShowMenu(false);
+    setTimeout(() => renameRef.current?.focus(), 0);
+  };
+
+  const saveRename = async () => {
+    const trimmed = renameVal.trim();
+    if (!trimmed || trimmed === list.title) {
+      setRenaming(false);
+      return;
+    }
+    try {
+      const updated = await updateList(list._id, { title: trimmed });
+      onListUpdated?.(updated);
+    } catch (err) {
+      console.error("Failed to rename list:", err);
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  /* ── WIP Limit ── */
+  const saveWip = async () => {
+    const parsed = wipVal === "" ? null : parseInt(wipVal, 10);
+    if (wipVal !== "" && (isNaN(parsed) || parsed < 1)) {
+      setEditWip(false);
+      setWipVal(list.wipLimit ?? "");
+      return;
+    }
+    try {
+      const updated = await updateList(list._id, { wipLimit: parsed });
+      onListUpdated?.(updated);
+    } catch (err) {
+      console.error("Failed to set WIP limit:", err);
+    } finally {
+      setEditWip(false);
+    }
+  };
+
+  /* ── Duplicate List ── */
+  const handleDuplicate = async () => {
+    setShowMenu(false);
+    setDuplicating(true);
+    try {
+      const newList = await duplicateList(list._id);
+      onListDuplicated?.(newList);
+    } catch (err) {
+      console.error("Failed to duplicate list:", err);
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
+  /* ── Styles ── */
+  const colBg       = isDark ? "rgba(2, 6, 23, 0.55)"   : "rgba(255, 255, 255, 0.88)";
+  const colBorder   = isDark ? "rgba(255,255,255,0.07)"  : "rgba(0,0,0,0.07)";
+  const colShadow   = isDark
+    ? "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)"
+    : "0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05)";
+  const headerTxt   = isDark ? "rgba(255,255,255,0.90)"  : "#111827";
+  const subTxt      = isDark ? "rgba(255,255,255,0.40)"  : "#9ca3af";
+  const menuBg      = isDark ? "rgba(15,23,42,0.95)"     : "#ffffff";
+  const menuBorder  = isDark ? "rgba(148,163,184,0.10)"  : "rgba(0,0,0,0.10)";
+  const inputBg     = isDark ? "rgba(255,255,255,0.07)"  : "rgba(0,0,0,0.04)";
+  const inputBorder = isDark ? "rgba(255,255,255,0.12)"  : "rgba(0,0,0,0.10)";
+  const inputTxt    = isDark ? "#fff"                    : "#111827";
+
   return (
     <div
       className="flex-shrink-0 w-72 flex flex-col rounded-2xl max-h-full animate-slide-in overflow-hidden"
       style={{
-        background: isDark
-          ? "rgba(2, 6, 23, 0.55)"
-          : "rgba(255, 255, 255, 0.88)",
+        background: colBg,
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: isDark
-          ? "1px solid rgba(255,255,255,0.07)"
-          : "1px solid rgba(0,0,0,0.07)",
-        boxShadow: isDark
-          ? "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)"
-          : "0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05)",
+        border: `1px solid ${colBorder}`,
+        boxShadow: colShadow,
       }}
     >
       {/* Top accent bar */}
-      <div className="h-0.5 w-full flex-shrink-0" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}44)` }} />
+      <div
+        className="h-0.5 w-full flex-shrink-0"
+        style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}44)` }}
+      />
 
       {/* Column header */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-3">
@@ -90,43 +180,71 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
           className="w-2 h-2 rounded-full flex-shrink-0"
           style={{ backgroundColor: accentColor, boxShadow: `0 0 6px ${accentColor}88` }}
         />
-        <h3 className="flex-1 text-sm font-bold truncate" style={{ color: isDark ? "rgba(255,255,255,0.90)" : "#111827" }}>{list.title}</h3>
 
-        {/* Card count */}
+        {/* Title — click to rename */}
+        {renaming ? (
+          <input
+            ref={renameRef}
+            value={renameVal}
+            onChange={(e) => setRenameVal(e.target.value)}
+            onBlur={saveRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")  saveRename();
+              if (e.key === "Escape") { setRenaming(false); setRenameVal(list.title); }
+            }}
+            className="flex-1 bg-transparent outline-none text-sm font-bold border-b"
+            style={{ borderColor: accentColor, color: headerTxt }}
+          />
+        ) : (
+          <h3
+            className="flex-1 text-sm font-bold truncate cursor-pointer hover:opacity-80 transition-opacity"
+            style={{ color: headerTxt }}
+            onDoubleClick={startRename}
+            title="Double-click to rename"
+          >
+            {list.title}
+          </h3>
+        )}
+
+        {/* Card count / WIP badge */}
         <span
           className={`min-w-[22px] h-5 px-1.5 rounded-full text-[11px] font-bold
             flex items-center justify-center transition-colors
             ${atWip ? "bg-red-500/20 text-red-400" : ""}`}
           style={atWip ? {} : {
             background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.07)",
-            color: isDark ? "rgba(255,255,255,0.50)" : "#6b7280",
+            color: subTxt,
           }}
         >
           {cards.length}
+          {list.wipLimit ? `/${list.wipLimit}` : ""}
         </span>
 
         {/* Column menu */}
         <div className="relative">
           <button
             onClick={() => setShowMenu((o) => !o)}
-            className="p-1.5 rounded-lg transition-all"
+            disabled={duplicating}
+            className="p-1.5 rounded-lg transition-all disabled:opacity-50"
             style={{ color: isDark ? "rgba(255,255,255,0.30)" : "#9ca3af" }}
           >
             <MoreHorizontal size={14} />
           </button>
+
           {showMenu && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setShowMenu(false)} />
               <div
-                className="absolute top-full right-0 mt-1 w-44 rounded-xl overflow-hidden z-30
+                className="absolute top-full right-0 mt-1 w-48 rounded-xl overflow-hidden z-30
                   animate-scale-in shadow-2xl"
                 style={{
-                  background: isDark ? "rgba(15,23,42,0.95)" : "#ffffff",
-                  border: isDark ? "1px solid rgba(148,163,184,0.10)" : "1px solid rgba(0,0,0,0.10)",
+                  background: menuBg,
+                  border: `1px solid ${menuBorder}`,
                   backdropFilter: "blur(12px)",
                   boxShadow: isDark ? "0 20px 60px rgba(0,0,0,0.60)" : "0 8px 30px rgba(0,0,0,0.12)",
                 }}
               >
+                {/* Add a card */}
                 <button
                   onClick={() => { setShowAddCard(true); setShowMenu(false); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
@@ -135,7 +253,40 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
                   <Plus size={14} className="text-violet-400" />
                   Add a card
                 </button>
+
+                {/* Rename */}
+                <button
+                  onClick={startRename}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                  style={{ color: isDark ? "#cbd5e1" : "#374151" }}
+                >
+                  <Edit3 size={14} className="text-blue-400" />
+                  Rename list
+                </button>
+
+                {/* Set WIP limit */}
+                <button
+                  onClick={() => { setEditWip(true); setShowMenu(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                  style={{ color: isDark ? "#cbd5e1" : "#374151" }}
+                >
+                  <Gauge size={14} className="text-amber-400" />
+                  {list.wipLimit ? `WIP limit: ${list.wipLimit}` : "Set WIP limit"}
+                </button>
+
+                {/* Duplicate */}
+                <button
+                  onClick={handleDuplicate}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                  style={{ color: isDark ? "#cbd5e1" : "#374151" }}
+                >
+                  <Copy size={14} className="text-emerald-400" />
+                  Duplicate list
+                </button>
+
                 <div style={{ borderTop: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.06)" }} />
+
+                {/* Archive */}
                 <button
                   onClick={() => { handleDeleteList(); setShowMenu(false); }}
                   disabled={deleting}
@@ -150,6 +301,43 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
           )}
         </div>
       </div>
+
+      {/* WIP limit inline editor */}
+      {editWip && (
+        <div className="mx-3 mb-2 flex items-center gap-2 animate-scale-in">
+          <input
+            autoFocus
+            type="number"
+            min="1"
+            value={wipVal}
+            onChange={(e) => setWipVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter")  saveWip();
+              if (e.key === "Escape") { setEditWip(false); setWipVal(list.wipLimit ?? ""); }
+            }}
+            placeholder="WIP limit (blank = off)"
+            className="flex-1 px-2.5 py-1.5 rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-400/60"
+            style={{
+              background: inputBg,
+              border: `1px solid ${inputBorder}`,
+              color: inputTxt,
+            }}
+          />
+          <button
+            onClick={saveWip}
+            className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold transition-all"
+          >
+            Set
+          </button>
+          <button
+            onClick={() => { setEditWip(false); setWipVal(list.wipLimit ?? ""); }}
+            className="p-1.5 rounded-lg text-xs transition-colors"
+            style={{ color: subTxt }}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
 
       {/* WIP warning */}
       {atWip && (
@@ -171,11 +359,15 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
         ))}
         {cards.length === 0 && !showAddCard && (
           <div className="py-6 flex flex-col items-center justify-center text-center">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
-              style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}>
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
+              style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
+            >
               <Plus size={14} style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }} />
             </div>
-            <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>No cards yet</p>
+            <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>
+              No cards yet
+            </p>
           </div>
         )}
       </div>
@@ -196,9 +388,9 @@ const ListColumn = ({ list, boardId, onCardAdded, onListDeleted, onCardClick, in
               rows={2}
               className="w-full px-3 py-2.5 rounded-xl text-sm resize-none transition-all outline-none focus:ring-2 focus:ring-violet-500/60"
               style={{
-                background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.04)",
-                border: isDark ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(0,0,0,0.10)",
-                color: isDark ? "#fff" : "#111827",
+                background: inputBg,
+                border: `1px solid ${inputBorder}`,
+                color: inputTxt,
               }}
             />
             <div className="flex gap-2">
