@@ -1,38 +1,33 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Settings, Users, UserPlus, Copy, Check, Shield, Trash2, AlertTriangle } from "lucide-react";
+import {
+  Settings, Users, UserPlus, Copy, Check, Shield, Trash2,
+  AlertTriangle, Sparkles, Mail, Globe, Crown, Eye, User,
+  Palette, Info
+} from "lucide-react";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/layout/Sidebar";
 
-const ICONS  = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
-const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
+const ICONS = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
+const COLORS = [
+  "#6366f1", // Indigo
+  "#8b5cf6", // Violet
+  "#ec4899", // Pink
+  "#14b8a6", // Teal
+  "#f97316", // Orange
+  "#eab308", // Yellow
+  "#22c55e", // Green
+  "#3b82f6"  // Blue
+];
 
-// ─── Tab button ───────────────────────────────────────────────────────────────
-const Tab = ({ label, active, onClick, icon: Icon }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
-      transition-all duration-200
-      ${active
-        ? "bg-violet-500/15 text-violet-300 shadow-sm"
-        : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/40"
-      }`}
-  >
-    <Icon size={15} />
-    {label}
-  </button>
-);
+const ROLE_META = {
+  owner:  { icon: Crown,  color: "#eab308", bg: "rgba(234,179,8,0.08)",  label: "Owner" },
+  admin:  { icon: Shield, color: "#8b5cf6", bg: "rgba(139,92,246,0.08)",  label: "Admin" },
+  member: { icon: User,   color: "#64748b", bg: "rgba(100,116,139,0.08)", label: "Member" },
+  viewer: { icon: Eye,    color: "#0ea5e9", bg: "rgba(14,165,233,0.08)",  label: "Viewer" }
+};
 
-// ─── Field wrapper ────────────────────────────────────────────────────────────
-const Field = ({ label, children }) => (
-  <div className="space-y-1.5">
-    <label className="block text-sm font-medium text-slate-300">{label}</label>
-    {children}
-  </div>
-);
-
-// ─── Workspace Settings ───────────────────────────────────────────────────────
 const WorkspaceSettings = () => {
   const { workspaceId } = useParams();
   const navigate = useNavigate();
@@ -46,11 +41,10 @@ const WorkspaceSettings = () => {
     icon:        activeWorkspace?.icon        || "🏢",
     color:       activeWorkspace?.color       || "#6366f1",
   });
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Invite form
   const [inviteEmail, setInviteEmail]   = useState("");
   const [inviteRole, setInviteRole]     = useState("member");
   const [inviting, setInviting]         = useState(false);
@@ -59,6 +53,7 @@ const WorkspaceSettings = () => {
 
   const userRole = activeWorkspace?.members?.find((m) => m.user?._id === user?._id)?.role;
   const canEdit  = ["owner", "admin"].includes(userRole);
+  const totalMembers = activeWorkspace?.members?.length || 0;
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -97,264 +92,412 @@ const WorkspaceSettings = () => {
   if (!activeWorkspace) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500">
-        Select a workspace first.
+        <div className="text-center space-y-2">
+          <Settings size={28} className="mx-auto text-slate-600 animate-spin" />
+          <p className="text-sm font-medium">Select a workspace first.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-      {/* ── Page header ─────────────────────────────────────────────── */}
-      <div
-        className="relative rounded-2xl overflow-hidden p-6 animate-fade-in"
-        style={{
-          background: form.color
-            ? `linear-gradient(135deg, ${form.color}25, ${form.color}08, transparent)`
-            : "linear-gradient(135deg, rgba(124,58,237,0.15), transparent)",
-          border: `1px solid ${form.color || "#7c3aed"}20`,
-        }}
-      >
-        <div className="flex items-center gap-4">
-          {/* Live preview icon */}
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl
-              shadow-xl flex-shrink-0 transition-all duration-300"
-            style={{
-              background: `linear-gradient(135deg, ${form.color}, ${form.color}99)`,
-              boxShadow: `0 8px 30px ${form.color}40`,
-            }}
-          >
-            {form.icon}
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-white leading-tight">
-              {form.name || activeWorkspace.name}
-            </h1>
-            <p className="text-sm text-slate-400 mt-0.5">Workspace Settings</p>
-          </div>
-        </div>
+    <div className="w-full min-h-full px-8 py-8 space-y-8 max-w-5xl mx-auto" style={{ color: "var(--color-text)" }}>
+      
+      {/* ── Header Title & Subtitle ─────────────────────────────────── */}
+      <div className="pb-5 border-b" style={{ borderColor: "var(--color-border)" }}>
+        <h1 className="text-2xl font-bold tracking-tight">Workspace Settings</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
+          Manage your workspace profile, colors, members, and collaborator permissions.
+        </p>
       </div>
 
-      {/* ── Tab navigation ──────────────────────────────────────────── */}
-      <div className="flex gap-1 p-1 rounded-2xl glass">
-        <Tab label="General" active={activeTab === "general"} onClick={() => setActiveTab("general")} icon={Settings} />
-        <Tab label="Members" active={activeTab === "members"} onClick={() => setActiveTab("members")} icon={Users} />
+      {/* ── Navigation Tabs ────────────────────────────────────────── */}
+      <div className="flex gap-6 border-b" style={{ borderColor: "var(--color-border)" }}>
+        <button
+          onClick={() => setActiveTab("general")}
+          className={`pb-3 text-sm font-medium transition-all relative ${
+            activeTab === "general" ? "text-violet-500 font-semibold" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          General
+          {activeTab === "general" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("members")}
+          className={`pb-3 text-sm font-medium transition-all relative ${
+            activeTab === "members" ? "text-violet-500 font-semibold" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          Members ({totalMembers})
+          {activeTab === "members" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full" />
+          )}
+        </button>
         {canEdit && (
-          <Tab label="Invite"  active={activeTab === "invite"}  onClick={() => setActiveTab("invite")}  icon={UserPlus} />
+          <button
+            onClick={() => setActiveTab("invite")}
+            className={`pb-3 text-sm font-medium transition-all relative ${
+              activeTab === "invite" ? "text-violet-500 font-semibold" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            Invite People
+            {activeTab === "invite" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full" />
+            )}
+          </button>
         )}
       </div>
 
-      {/* ── General tab ─────────────────────────────────────────────── */}
-      {activeTab === "general" && (
-        <div className="glass rounded-2xl overflow-hidden animate-fade-in">
-          <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-              <Settings size={15} className="text-violet-400" />
-            </div>
-            <h3 className="text-base font-bold text-white">General settings</h3>
-          </div>
-          <form onSubmit={handleSave} className="p-6 space-y-5">
+      {/* ── Active Tab View ─────────────────────────────────────────── */}
+      <div className="w-full">
+        
+        {/* ── Tab: General Settings ───────────────────────────────── */}
+        {activeTab === "general" && (
+          <form onSubmit={handleSave} className="space-y-6 animate-fade-in">
             {saveError && (
-              <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20
-                text-red-400 text-sm flex items-center gap-2 animate-fade-in">
+              <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 animate-fade-in">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
                 {saveError}
               </div>
             )}
 
-            <Field label="Workspace name">
-              <input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                disabled={!canEdit}
-                className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </Field>
-
-            <Field label="Description">
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                disabled={!canEdit}
-                rows={3}
-                className="input-field resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                placeholder="What does this workspace track?"
-              />
-            </Field>
-
-            {/* Icon + Color grid */}
-            <div className="grid grid-cols-2 gap-5">
-              <Field label="Icon">
-                <div className="flex flex-wrap gap-1.5">
-                  {ICONS.map((icon) => (
-                    <button
-                      key={icon}
-                      type="button"
-                      onClick={() => canEdit && setForm((f) => ({ ...f, icon }))}
-                      className={`w-9 h-9 rounded-xl text-lg transition-all duration-150
-                        ${form.icon === icon
-                          ? "bg-violet-500/20 ring-2 ring-violet-500 scale-110"
-                          : "bg-slate-800/60 hover:bg-slate-700"
-                        }
-                        ${!canEdit ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}`}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              <Field label="Color">
-                <div className="flex flex-wrap gap-2">
-                  {COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => canEdit && setForm((f) => ({ ...f, color }))}
-                      className={`w-8 h-8 rounded-full transition-all duration-150
-                        ${!canEdit ? "opacity-50 cursor-not-allowed" : "hover:scale-110"}`}
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: form.color === color
-                          ? `0 0 0 3px rgba(255,255,255,0.15), 0 0 0 5px ${color}60, 0 0 15px ${color}50`
-                          : "none",
-                        transform: form.color === color ? "scale(1.15)" : undefined,
-                      }}
-                    />
-                  ))}
-                </div>
-              </Field>
-            </div>
-
-            {canEdit && (
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary"
-              >
-                {saved ? (
-                  <><Check size={14} /> Saved!</>
-                ) : saving ? (
-                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
-                ) : (
-                  "Save changes"
-                )}
-              </button>
-            )}
-          </form>
-        </div>
-      )}
-
-      {/* ── Members tab ─────────────────────────────────────────────── */}
-      {activeTab === "members" && (
-        <div className="glass rounded-2xl overflow-hidden animate-fade-in">
-          <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-              <Users size={15} className="text-violet-400" />
-            </div>
-            <h3 className="text-base font-bold text-white flex-1">Members</h3>
-            <span className="text-xs text-slate-500 bg-slate-800 px-2.5 py-1 rounded-full">
-              {activeWorkspace.members?.length || 0}
-            </span>
-          </div>
-          <div className="px-4 py-2">
-            {activeWorkspace.members?.map((member) => (
-              <div
-                key={member.user?._id || member.user}
-                className="flex items-center gap-3 py-3 px-2 rounded-xl
-                  hover:bg-white/3 transition-all group"
-              >
-                <Avatar user={member.user} size="sm" online={member.user?._id === user?._id} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
-                    {member.user?.name || "Unknown"}
-                    {member.user?._id === user?._id && (
-                      <span className="ml-2 text-xs text-slate-500 font-normal">(you)</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">{member.user?.email}</p>
-                </div>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5
-                  ${member.role === "owner"  ? "bg-amber-500/15 text-amber-300 border-amber-500/20" :
-                    member.role === "admin"  ? "bg-violet-500/15 text-violet-300 border-violet-500/20" :
-                                               "bg-slate-700/40 text-slate-400 border-slate-700/60"}`}
-                >
-                  {member.role === "owner" && <Shield size={10} />}
-                  {member.role}
-                </span>
+            {/* Profile Card */}
+            <div
+              className="rounded-xl border p-6 space-y-6"
+              style={{
+                backgroundColor: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <div>
+                <h3 className="text-base font-semibold">Workspace Profile</h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                  Change the name and details of this workspace.
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ── Invite tab ──────────────────────────────────────────────── */}
-      {activeTab === "invite" && canEdit && (
-        <div className="glass rounded-2xl overflow-hidden animate-fade-in">
-          <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-              <UserPlus size={15} className="text-violet-400" />
-            </div>
-            <h3 className="text-base font-bold text-white">Invite members</h3>
-          </div>
-          <form onSubmit={handleInvite} className="p-6 space-y-4">
-            <div className="flex gap-3">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@company.com"
-                className="input-field flex-1"
-              />
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                className="input-field w-32 flex-shrink-0"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-                <option value="viewer">Viewer</option>
-              </select>
-            </div>
-            <button type="submit" disabled={inviting || !inviteEmail} className="btn-primary">
-              <UserPlus size={14} />
-              {inviting ? "Sending…" : "Send invite"}
-            </button>
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Workspace Name
+                  </label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    disabled={!canEdit}
+                    placeholder="Workspace name"
+                    className="input-field disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
 
-            {inviteResult && (
-              <div className={`p-4 rounded-xl border text-sm animate-fade-in
-                ${inviteResult.success
-                  ? "bg-emerald-500/8 border-emerald-500/20 text-emerald-400"
-                  : "bg-red-500/8 border-red-500/20 text-red-400"}`}
-              >
-                {inviteResult.success ? (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Workspace Description
+                  </label>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    disabled={!canEdit}
+                    rows={3}
+                    placeholder="Workspace description"
+                    className="input-field resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Theme & Branding Card */}
+            <div
+              className="rounded-xl border p-6 space-y-6"
+              style={{
+                backgroundColor: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <div>
+                <h3 className="text-base font-semibold">Workspace Theme</h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                  Customize the appearance and branding of your workspace.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Pickers */}
+                <div className="space-y-5">
                   <div className="space-y-2">
-                    <p className="font-semibold flex items-center gap-2">
-                      <Check size={14} /> Invite created!
-                    </p>
-                    <div className="flex items-center gap-2 bg-slate-800/60 px-3 py-2 rounded-xl
-                      border border-slate-700/40">
-                      <code className="flex-1 text-xs text-slate-300 truncate">
-                        {inviteResult.invite?.inviteLink}
-                      </code>
-                      <button onClick={copyLink}
-                        className={`p-1.5 rounded-lg transition-all
-                          ${copiedLink ? "text-emerald-400 bg-emerald-500/15" : "text-slate-400 hover:text-white"}`}>
-                        {copiedLink ? <Check size={13} /> : <Copy size={13} />}
-                      </button>
+                    <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Workspace Icon
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {ICONS.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          onClick={() => canEdit && setForm((f) => ({ ...f, icon }))}
+                          className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all duration-150
+                            ${form.icon === icon
+                              ? "bg-violet-500/20 ring-2 ring-violet-500 scale-105"
+                              : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+                            }
+                            ${!canEdit ? "opacity-45 cursor-not-allowed" : "hover:scale-105"}`}
+                        >
+                          {icon}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                    {inviteResult.message}
+
+                  <div className="space-y-2">
+                    <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Workspace Theme Color
+                    </span>
+                    <div className="flex flex-wrap gap-2.5">
+                      {COLORS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => canEdit && setForm((f) => ({ ...f, color }))}
+                          className={`w-7 h-7 rounded-full transition-all duration-150 relative flex items-center justify-center
+                            ${!canEdit ? "opacity-45 cursor-not-allowed" : "hover:scale-110"}`}
+                          style={{
+                            backgroundColor: color,
+                            boxShadow: form.color === color
+                              ? `0 0 0 2px var(--color-surface), 0 0 0 4px ${color}`
+                              : "none",
+                          }}
+                        >
+                          {form.color === color && (
+                            <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Branding Preview */}
+                <div className="flex flex-col justify-center items-center p-6 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/10">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-4 self-start">
+                    Branding Preview
+                  </span>
+                  <div
+                    className="flex items-center gap-3.5 p-4 rounded-xl border w-full max-w-sm"
+                    style={{
+                      backgroundColor: "var(--color-surface)",
+                      borderColor: "var(--color-border)",
+                    }}
+                  >
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-sm text-white"
+                      style={{
+                        background: `linear-gradient(135deg, ${form.color}, ${form.color}bb)`,
+                      }}
+                    >
+                      {form.icon}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold truncate">{form.name || "My Workspace"}</p>
+                      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                        {totalMembers} member{totalMembers !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            {canEdit && (
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn-primary px-8 py-3 shadow-md shadow-violet-500/15"
+                >
+                  {saved ? (
+                    <><Check size={16} /> Saved Successfully!</>
+                  ) : saving ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                  ) : (
+                    "Save Workspace Details"
+                  )}
+                </button>
               </div>
             )}
           </form>
-        </div>
-      )}
+        )}
+
+        {/* ── Tab: Members Directory ──────────────────────────────── */}
+        {activeTab === "members" && (
+          <div className="space-y-4 animate-fade-in">
+            <div
+              className="rounded-xl border overflow-hidden"
+              style={{
+                backgroundColor: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}>
+                    <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Member
+                    </th>
+                    <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Email Address
+                    </th>
+                    <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Workspace Role
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {activeWorkspace.members?.map((member) => {
+                    const isYou = member.user?._id === user?._id;
+                    const meta = ROLE_META[member.role] || ROLE_META.member;
+                    const RoleIcon = meta.icon;
+
+                    return (
+                      <tr key={member.user?._id || member.user} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10">
+                        <td className="px-6 py-4 flex items-center gap-3">
+                          <Avatar user={member.user} size="sm" online={isYou} />
+                          <span className="text-sm font-medium">
+                            {member.user?.name || "Unknown"}
+                            {isYou && (
+                              <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                                You
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
+                          {member.user?.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                            style={{
+                              backgroundColor: meta.bg,
+                              color: meta.color,
+                              border: `1px solid ${meta.color}20`
+                            }}
+                          >
+                            <RoleIcon size={11} />
+                            {meta.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Invite Collaborators ──────────────────────────── */}
+        {activeTab === "invite" && canEdit && (
+          <div className="space-y-6 animate-fade-in">
+            <div
+              className="rounded-xl border p-6 space-y-6"
+              style={{
+                backgroundColor: "var(--color-surface)",
+                borderColor: "var(--color-border)",
+              }}
+            >
+              <div>
+                <h3 className="text-base font-semibold">Invite Members</h3>
+                <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                  Send an email invitation to add collaborators to this workspace.
+                </p>
+              </div>
+
+              <form onSubmit={handleInvite} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="collaborator@company.com"
+                        className="input-field pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      Role
+                    </label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value)}
+                      className="input-field select-field"
+                    >
+                      <option value="member">Member</option>
+                      <option value="admin">Admin</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button type="submit" disabled={inviting || !inviteEmail} className="btn-primary">
+                    <UserPlus size={15} />
+                    {inviting ? "Sending..." : "Send Invite"}
+                  </button>
+                </div>
+              </form>
+
+              {inviteResult && (
+                <div className={`p-4 rounded-xl border text-sm animate-fade-in
+                  ${inviteResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                    : "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"}`}
+                >
+                  {inviteResult.success ? (
+                    <div className="space-y-3">
+                      <p className="font-semibold flex items-center gap-2">
+                        <Check size={16} /> Invitation link generated successfully!
+                      </p>
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <code className="flex-1 text-xs truncate">
+                          {inviteResult.invite?.inviteLink}
+                        </code>
+                        <button
+                          onClick={copyLink}
+                          type="button"
+                          className={`p-1.5 rounded-lg transition-all
+                            ${copiedLink
+                              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                              : "text-slate-500 hover:text-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800"
+                            }`}
+                        >
+                          {copiedLink ? <Check size={13} /> : <Copy size={13} />}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                      {inviteResult.message}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 };
