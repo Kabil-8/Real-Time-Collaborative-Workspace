@@ -21,6 +21,7 @@ const BoardCard = ({ board, onClick }) => (
       duration-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-black/30"
     style={{ background: board.background?.value || GRADIENTS[0] }}
   >
+    
     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
     <div className="relative p-4 h-full flex flex-col justify-between">
       <div className="flex items-start justify-between">
