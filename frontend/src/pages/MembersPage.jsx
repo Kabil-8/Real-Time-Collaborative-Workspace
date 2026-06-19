@@ -263,6 +263,52 @@ const MemberCard = ({ member, currentUserId, userRole, workspaceId, onRemove }) 
   );
 };
 
+// ─── Member List Row (list-view) ─────────────────────────────────────────────
+// Must be its own component so useState is not called inside a .map() callback
+const MemberListRow = ({ member, currentUserId, userRole, workspaceId, onRemove }) => {
+  const isSelf    = member.user?._id === currentUserId;
+  const canRemove = isSelf || (["owner", "admin"].includes(userRole) && member.role !== "owner");
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemoveItem = async () => {
+    if (!window.confirm(isSelf ? "Leave?" : `Remove ${member.user?.name}?`)) return;
+    setRemoving(true);
+    try {
+      await api.delete(`/workspaces/${workspaceId}/members/${member.user?._id}`);
+      onRemove(member.user?._id);
+    } catch (e) {
+      setRemoving(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-4 px-6 py-4 hover:bg-white/3 transition-all group"
+    >
+      <Avatar user={member.user} size="md" online={isSelf} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-white truncate">
+          {member.user?.name || "Unknown"}
+          {isSelf && <span className="ml-2 text-xs text-violet-400 font-medium">(you)</span>}
+        </p>
+        <p className="text-xs text-slate-500 truncate">{member.user?.email}</p>
+      </div>
+      <RoleBadge role={member.role} />
+      {canRemove && (
+        <button
+          onClick={handleRemoveItem}
+          disabled={removing}
+          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl
+            text-slate-600 hover:text-red-400 hover:bg-red-500/10
+            transition-all disabled:opacity-30"
+        >
+          <LogOut size={14} />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Members Page ────────────────────────────────────────────────────────
 const MembersPage = () => {
   const { activeWorkspace, setWorkspaces } = useWorkspace();
@@ -469,41 +515,16 @@ const MembersPage = () => {
           /* ── List view ──────────────────────────────────────────────── */
           <div className="glass rounded-3xl overflow-hidden">
             <div className="divide-y divide-white/4">
-              {filtered.map((member) => {
-                const isSelf = member.user?._id === user?._id;
-                const canRemove = isSelf || (["owner","admin"].includes(userRole) && member.role !== "owner");
-                const [removing, setRemoving] = useState(false);
-                const handleRemoveItem = async () => {
-                  if (!window.confirm(isSelf ? "Leave?" : `Remove ${member.user?.name}?`)) return;
-                  setRemoving(true);
-                  try {
-                    await api.delete(`/workspaces/${activeWorkspace._id}/members/${member.user?._id}`);
-                    handleRemove(member.user?._id);
-                  } catch(e) { setRemoving(false); }
-                };
-                return (
-                  <div key={member.user?._id || member.user}
-                    className="flex items-center gap-4 px-6 py-4 hover:bg-white/3 transition-all group">
-                    <Avatar user={member.user} size="md" online={isSelf} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">
-                        {member.user?.name || "Unknown"}
-                        {isSelf && <span className="ml-2 text-xs text-violet-400 font-medium">(you)</span>}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">{member.user?.email}</p>
-                    </div>
-                    <RoleBadge role={member.role} />
-                    {canRemove && (
-                      <button onClick={handleRemoveItem} disabled={removing}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl
-                          text-slate-600 hover:text-red-400 hover:bg-red-500/10
-                          transition-all disabled:opacity-30">
-                        <LogOut size={14} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+              {filtered.map((member) => (
+                <MemberListRow
+                  key={member.user?._id || member.user}
+                  member={member}
+                  currentUserId={user?._id}
+                  userRole={userRole}
+                  workspaceId={activeWorkspace._id}
+                  onRemove={handleRemove}
+                />
+              ))}
             </div>
           </div>
         )}

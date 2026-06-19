@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   Plus, X, ArrowLeft, Star, Loader2, Users, List
 } from "lucide-react";
-import { fetchListsByBoard } from "../utils/listsApi";
+import { fetchListsByBoard, moveList } from "../utils/listsApi";
+import { moveCard } from "../utils/cardsApi";
 import api from "../utils/api";
 import ListColumn from "../components/board/ListColumn";
 import CardDetailModal from "../components/board/CardDetailModal";
-import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
 // ─── Add-list form ─────────────────────────────────────────────
@@ -155,12 +156,11 @@ const BoardPage = () => {
     ));
 
   const handleCardUpdated = (updatedCard, action) => {
-    // Card moved to another list
     if (action === "move") {
       setLists(prev => prev.map(l => ({
         ...l,
         cardOrder: l._id === (updatedCard.list?._id || updatedCard.list)
-          ? [...(l.cardOrder || []), updatedCard]  // add to new list (will refresh on next load)
+          ? [...(l.cardOrder || []), updatedCard]
           : (l.cardOrder || []).filter(c => c._id !== updatedCard._id),
       })));
       return;
@@ -180,7 +180,6 @@ const BoardPage = () => {
       })));
       return;
     }
-    // Generic field update
     setLists(prev => prev.map(l => ({
       ...l,
       cardOrder: (l.cardOrder || []).map(c =>
@@ -188,6 +187,77 @@ const BoardPage = () => {
       ),
     })));
   };
+
+  /* ── Drag-and-drop handler ─────────────────────────────────── */
+  const onDragEnd = useCallback(async (result) => {
+    const { source, destination, type, draggableId } = result;
+
+    // Dropped outside a droppable or in the same spot
+    if (!destination) return;
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) return;
+
+    // ── LIST reorder ──────────────────────────────────────────
+    if (type === "LIST") {
+      const reordered = Array.from(lists);
+      const [removed] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, removed);
+      setLists(reordered); // optimistic update
+
+      try {
+        await moveList(draggableId, destination.index);
+      } catch (err) {
+        console.error("Failed to persist list move:", err);
+        setLists(lists); // revert
+      }
+      return;
+    }
+
+    // ── CARD move ─────────────────────────────────────────────
+    const sourceList = lists.find(l => l._id === source.droppableId);
+    const destList   = lists.find(l => l._id === destination.droppableId);
+    if (!sourceList || !destList) return;
+
+    const sourceCards = Array.from(sourceList.cardOrder || []);
+    const [movedCard] = sourceCards.splice(source.index, 1);
+
+    if (source.droppableId === destination.droppableId) {
+      // Same-list reorder
+      sourceCards.splice(destination.index, 0, movedCard);
+      setLists(prev =>
+        prev.map(l =>
+          l._id === source.droppableId
+            ? { ...l, cardOrder: sourceCards }
+            : l
+        )
+      );
+    } else {
+      // Cross-list move
+      const destCards = Array.from(destList.cardOrder || []);
+      destCards.splice(destination.index, 0, movedCard);
+      setLists(prev =>
+        prev.map(l => {
+          if (l._id === source.droppableId) return { ...l, cardOrder: sourceCards };
+          if (l._id === destination.droppableId) return { ...l, cardOrder: destCards };
+          return l;
+        })
+      );
+    }
+
+    // Persist to backend
+    try {
+      await moveCard(movedCard._id, {
+        targetListId: destination.droppableId,
+        newPosition: destination.index,
+      });
+    } catch (err) {
+      console.error("Failed to persist card move:", err);
+      // Revert to server state
+      loadBoard();
+    }
+  }, [lists, loadBoard]);
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-950 h-full">
@@ -223,24 +293,69 @@ const BoardPage = () => {
       <div className="relative flex flex-col h-full">
         <BoardHeader board={board} onBack={() => navigate("/")} listCount={lists.length} />
 
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-4 p-6 h-full items-start min-w-max">
-            {lists.map((list, idx) => (
-              <ListColumn
-                key={list._id}
-                list={list}
-                boardId={boardId}
-                index={idx}
-                onCardAdded={handleCardAdded}
-                onListDeleted={handleListDeleted}
-                onListUpdated={handleListUpdated}
-                onListDuplicated={handleListDuplicated}
-                onCardClick={(card) => setActiveCardId(card._id)}
-              />
-            ))}
-            <AddListForm boardId={boardId} onListAdded={handleListAdded} />
-          </div>
-        </div>
+        {/* ── DnD Context wraps the entire board canvas ── */}
+        <DragDropContext onDragEnd={onDragEnd}>
+          {/* Droppable for list-level reordering (horizontal) */}
+          <Droppable
+            droppableId="board-lists"
+            direction="horizontal"
+            type="LIST"
+          >
+            {(provided, snapshot) => (
+              <div
+                className="flex-1 overflow-x-auto overflow-y-hidden"
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+              >
+                <div
+                  className="flex gap-4 p-6 h-full items-start min-w-max"
+                  style={{
+                    // Subtle highlight when dragging a list
+                    transition: "background 0.2s",
+                    background: snapshot.isDraggingOver && isDark
+                      ? "rgba(124,58,237,0.04)"
+                      : "transparent",
+                  }}
+                >
+                  {lists.map((list, idx) => (
+                    <Draggable
+                      key={list._id}
+                      draggableId={list._id}
+                      index={idx}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          style={{
+                            ...provided.draggableProps.style,
+                            opacity: snapshot.isDragging ? 0.92 : 1,
+                            transform: provided.draggableProps.style?.transform,
+                          }}
+                        >
+                          <ListColumn
+                            list={list}
+                            boardId={boardId}
+                            index={idx}
+                            onCardAdded={handleCardAdded}
+                            onListDeleted={handleListDeleted}
+                            onListUpdated={handleListUpdated}
+                            onListDuplicated={handleListDuplicated}
+                            onCardClick={(card) => setActiveCardId(card._id)}
+                            dragHandleProps={provided.dragHandleProps}
+                            isDraggingList={snapshot.isDragging}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                  <AddListForm boardId={boardId} onListAdded={handleListAdded} />
+                </div>
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
       </div>
 
       {activeCardId && (

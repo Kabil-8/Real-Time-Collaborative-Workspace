@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { Plus, X, MoreHorizontal, Trash2, Copy, Edit3, Gauge } from "lucide-react";
+import { Plus, X, MoreHorizontal, Trash2, Copy, Edit3, Gauge, GripVertical } from "lucide-react";
+import { Droppable } from "@hello-pangea/dnd";
 import CardItem from "./CardItem";
 import { useTheme } from "../../context/ThemeContext";
 import { archiveList, updateList, duplicateList } from "../../utils/listsApi";
@@ -18,8 +19,11 @@ const COLUMN_COLORS = [
 ];
 
 /**
- * ListColumn — frosted-glass Kanban column with full CRUD via REST APIs
- * Features: add card, rename, set WIP limit, duplicate, archive list
+ * ListColumn — frosted-glass Kanban column with full CRUD via REST APIs.
+ * Now DnD-aware:
+ *  - The column header exposes a drag handle (GripVertical icon) wired to dragHandleProps.
+ *  - The card body area is wrapped in a <Droppable> so cards can be dropped in.
+ *  - Each card is rendered via <CardItem> which is now a <Draggable>.
  */
 const ListColumn = ({
   list,
@@ -30,6 +34,8 @@ const ListColumn = ({
   onListDuplicated,
   onCardClick,
   index = 0,
+  dragHandleProps = {},   // from <Draggable> in BoardPage
+  isDraggingList = false, // visual cue while the whole list is being dragged
 }) => {
   const { isDark } = useTheme();
   const [showAddCard, setShowAddCard] = useState(false);
@@ -145,9 +151,13 @@ const ListColumn = ({
   /* ── Styles ── */
   const colBg       = isDark ? "rgba(2, 6, 23, 0.55)"   : "rgba(255, 255, 255, 0.88)";
   const colBorder   = isDark ? "rgba(255,255,255,0.07)"  : "rgba(0,0,0,0.07)";
-  const colShadow   = isDark
-    ? "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)"
-    : "0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05)";
+  const colShadow   = isDraggingList
+    ? (isDark
+        ? "0 20px 60px rgba(0,0,0,0.55), 0 0 0 2px rgba(124,58,237,0.45), inset 0 1px 0 rgba(255,255,255,0.08)"
+        : "0 20px 50px rgba(0,0,0,0.16), 0 0 0 2px rgba(124,58,237,0.30)")
+    : isDark
+      ? "0 8px 40px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05)"
+      : "0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05)";
   const headerTxt   = isDark ? "rgba(255,255,255,0.90)"  : "#111827";
   const subTxt      = isDark ? "rgba(255,255,255,0.40)"  : "#9ca3af";
   const menuBg      = isDark ? "rgba(15,23,42,0.95)"     : "#ffffff";
@@ -163,8 +173,13 @@ const ListColumn = ({
         background: colBg,
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: `1px solid ${colBorder}`,
+        border: isDraggingList
+          ? `1px solid ${accentColor}66`
+          : `1px solid ${colBorder}`,
         boxShadow: colShadow,
+        transition: "box-shadow 0.2s, border-color 0.2s",
+        // Slight rotation while dragging for a "lifted" feel
+        rotate: isDraggingList ? "1.5deg" : "0deg",
       }}
     >
       {/* Top accent bar */}
@@ -175,13 +190,24 @@ const ListColumn = ({
 
       {/* Column header */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-3">
+        {/* ── Drag handle for list reorder ── */}
+        <button
+          {...dragHandleProps}
+          aria-label="Drag to reorder list"
+          className="p-0.5 rounded cursor-grab active:cursor-grabbing transition-opacity opacity-30 hover:opacity-70 flex-shrink-0"
+          style={{ color: isDark ? "#fff" : "#374151", touchAction: "none" }}
+          tabIndex={-1}
+        >
+          <GripVertical size={14} />
+        </button>
+
         {/* Color dot */}
         <span
           className="w-2 h-2 rounded-full flex-shrink-0"
           style={{ backgroundColor: accentColor, boxShadow: `0 0 6px ${accentColor}88` }}
         />
 
-        {/* Title — click to rename */}
+        {/* Title — double-click to rename */}
         {renaming ? (
           <input
             ref={renameRef}
@@ -348,29 +374,52 @@ const ListColumn = ({
         </div>
       )}
 
-      {/* Cards */}
-      <div className="flex-1 overflow-y-auto px-3 py-1 space-y-2 min-h-0">
-        {cards.map((card) => (
-          <CardItem
-            key={card._id}
-            card={card}
-            onClick={() => onCardClick?.(card)}
-          />
-        ))}
-        {cards.length === 0 && !showAddCard && (
-          <div className="py-6 flex flex-col items-center justify-center text-center">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
-              style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
-            >
-              <Plus size={14} style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }} />
+      {/* ── Cards — wrapped in a Droppable ── */}
+      <Droppable droppableId={list._id} type="CARD">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className="flex-1 overflow-y-auto px-3 py-1 min-h-0"
+            style={{
+              // Highlight drop zone
+              background: snapshot.isDraggingOver
+                ? isDark
+                  ? "rgba(124,58,237,0.08)"
+                  : "rgba(124,58,237,0.05)"
+                : "transparent",
+              transition: "background 0.15s ease",
+              // Ensure minimum height so empty lists can still receive drops
+              minHeight: cards.length === 0 ? "80px" : undefined,
+            }}
+          >
+            <div className="space-y-2">
+              {cards.map((card, cardIdx) => (
+                <CardItem
+                  key={card._id}
+                  card={card}
+                  index={cardIdx}
+                  onClick={() => onCardClick?.(card)}
+                />
+              ))}
+              {provided.placeholder}
             </div>
-            <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>
-              No cards yet
-            </p>
+            {cards.length === 0 && !showAddCard && (
+              <div className="py-6 flex flex-col items-center justify-center text-center">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
+                  style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
+                >
+                  <Plus size={14} style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }} />
+                </div>
+                <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>
+                  {snapshot.isDraggingOver ? "Drop card here" : "No cards yet"}
+                </p>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </Droppable>
 
       {/* Add card area */}
       <div className="px-3 pb-3 pt-1 flex-shrink-0">
