@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
-  Plus, X, ArrowLeft, Star, Loader2, Users, List
+  Plus, X, ArrowLeft, Star, Users, List, AlertCircle
 } from "lucide-react";
 import { fetchListsByBoard, moveList } from "../utils/listsApi";
 import { moveCard } from "../utils/cardsApi";
@@ -10,6 +10,30 @@ import api from "../utils/api";
 import ListColumn from "../components/board/ListColumn";
 import CardDetailModal from "../components/board/CardDetailModal";
 import { useTheme } from "../context/ThemeContext";
+
+// ─── WIP Toast ─────────────────────────────────────────────────
+const WipToast = ({ message, onDismiss }) => (
+  <div
+    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3
+      px-5 py-3.5 rounded-2xl shadow-2xl animate-scale-in"
+    style={{
+      background: "rgba(239,68,68,0.12)",
+      border: "1px solid rgba(239,68,68,0.35)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      color: "#fca5a5",
+    }}
+  >
+    <AlertCircle size={16} className="flex-shrink-0 text-red-400" />
+    <span className="text-sm font-medium">{message}</span>
+    <button
+      onClick={onDismiss}
+      className="ml-2 p-0.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity"
+    >
+      <X size={13} />
+    </button>
+  </div>
+);
 
 // ─── Add-list form ─────────────────────────────────────────────
 const AddListForm = ({ boardId, onListAdded }) => {
@@ -125,6 +149,13 @@ const BoardPage = () => {
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
   const [activeCardId, setActiveCardId] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [wipToast, setWipToast] = useState("");
+
+  // Keep a ref always pointing at the latest lists — prevents stale closure
+  // inside onDragEnd when reverting optimistic updates
+  const listsRef = useRef(lists);
+  useEffect(() => { listsRef.current = lists; }, [lists]);
 
   const loadBoard = useCallback(async () => {
     if (!boardId) return;
@@ -189,19 +220,31 @@ const BoardPage = () => {
   };
 
   /* ── Drag-and-drop handler ─────────────────────────────────── */
+  const onDragStart = useCallback(() => {
+    setIsDragging(true);
+    // Prevent text selection during drag on touch devices
+    document.body.style.userSelect = "none";
+  }, []);
+
   const onDragEnd = useCallback(async (result) => {
+    setIsDragging(false);
+    document.body.style.userSelect = "";
+
     const { source, destination, type, draggableId } = result;
 
-    // Dropped outside a droppable or in the same spot
+    // Dropped outside a droppable or in the same spot → no-op
     if (!destination) return;
     if (
       source.droppableId === destination.droppableId &&
       source.index === destination.index
     ) return;
 
+    // Capture current lists from ref (avoids stale closure)
+    const currentLists = listsRef.current;
+
     // ── LIST reorder ──────────────────────────────────────────
     if (type === "LIST") {
-      const reordered = Array.from(lists);
+      const reordered = Array.from(currentLists);
       const [removed] = reordered.splice(source.index, 1);
       reordered.splice(destination.index, 0, removed);
       setLists(reordered); // optimistic update
@@ -210,20 +253,33 @@ const BoardPage = () => {
         await moveList(draggableId, destination.index);
       } catch (err) {
         console.error("Failed to persist list move:", err);
-        setLists(lists); // revert
+        setLists(currentLists); // revert using captured snapshot
       }
       return;
     }
 
     // ── CARD move ─────────────────────────────────────────────
-    const sourceList = lists.find(l => l._id === source.droppableId);
-    const destList   = lists.find(l => l._id === destination.droppableId);
+    const sourceList = currentLists.find(l => l._id === source.droppableId);
+    const destList   = currentLists.find(l => l._id === destination.droppableId);
     if (!sourceList || !destList) return;
+
+    // WIP pre-flight check (client-side) — prevent cross-list if already at cap
+    const isCross = source.droppableId !== destination.droppableId;
+    if (isCross && destList.wipLimit) {
+      const destCardCount = (destList.cardOrder || []).length;
+      if (destCardCount >= destList.wipLimit) {
+        setWipToast(
+          `"${destList.title}" is at its WIP limit (${destList.wipLimit}). Move or archive a card first.`
+        );
+        setTimeout(() => setWipToast(""), 5000);
+        return; // block the drop
+      }
+    }
 
     const sourceCards = Array.from(sourceList.cardOrder || []);
     const [movedCard] = sourceCards.splice(source.index, 1);
 
-    if (source.droppableId === destination.droppableId) {
+    if (!isCross) {
       // Same-list reorder
       sourceCards.splice(destination.index, 0, movedCard);
       setLists(prev =>
@@ -234,7 +290,7 @@ const BoardPage = () => {
         )
       );
     } else {
-      // Cross-list move
+      // Cross-list move — optimistic update
       const destCards = Array.from(destList.cardOrder || []);
       destCards.splice(destination.index, 0, movedCard);
       setLists(prev =>
@@ -254,10 +310,16 @@ const BoardPage = () => {
       });
     } catch (err) {
       console.error("Failed to persist card move:", err);
+      // Surface WIP errors from server
+      const msg = err?.response?.data?.message;
+      if (msg) {
+        setWipToast(msg);
+        setTimeout(() => setWipToast(""), 5000);
+      }
       // Revert to server state
       loadBoard();
     }
-  }, [lists, loadBoard]);
+  }, [loadBoard]);
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center bg-slate-950 h-full">
@@ -294,7 +356,7 @@ const BoardPage = () => {
         <BoardHeader board={board} onBack={() => navigate("/")} listCount={lists.length} />
 
         {/* ── DnD Context wraps the entire board canvas ── */}
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
           {/* Droppable for list-level reordering (horizontal) */}
           <Droppable
             droppableId="board-lists"
@@ -308,12 +370,15 @@ const BoardPage = () => {
                 {...provided.droppableProps}
               >
                 <div
-                  className="flex gap-4 p-6 h-full items-start min-w-max"
+                  className={`flex gap-4 p-6 h-full items-start min-w-max dnd-board-canvas${
+                    isDragging ? " is-dragging" : ""
+                  }`}
                   style={{
-                    // Subtle highlight when dragging a list
-                    transition: "background 0.2s",
-                    background: snapshot.isDraggingOver && isDark
-                      ? "rgba(124,58,237,0.04)"
+                    transition: "background 0.25s ease",
+                    background: snapshot.isDraggingOver
+                      ? isDark
+                        ? "rgba(124,58,237,0.05)"
+                        : "rgba(124,58,237,0.03)"
                       : "transparent",
                   }}
                 >
@@ -327,10 +392,11 @@ const BoardPage = () => {
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
+                          className={snapshot.isDragging ? "dnd-list-dragging" : ""}
                           style={{
                             ...provided.draggableProps.style,
-                            opacity: snapshot.isDragging ? 0.92 : 1,
-                            transform: provided.draggableProps.style?.transform,
+                            // Keep the ghost visible but slightly faded
+                            opacity: snapshot.isDragging ? 0.90 : 1,
                           }}
                         >
                           <ListColumn
@@ -365,6 +431,11 @@ const BoardPage = () => {
           onClose={() => setActiveCardId(null)}
           onCardUpdated={handleCardUpdated}
         />
+      )}
+
+      {/* WIP limit violation toast */}
+      {wipToast && (
+        <WipToast message={wipToast} onDismiss={() => setWipToast("")} />
       )}
     </div>
   );

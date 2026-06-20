@@ -191,15 +191,16 @@ const ListColumn = ({
       {/* Column header */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-3">
         {/* ── Drag handle for list reorder ── */}
-        <button
+        <div
           {...dragHandleProps}
+          role="button"
           aria-label="Drag to reorder list"
+          tabIndex={-1}
           className="p-0.5 rounded cursor-grab active:cursor-grabbing transition-opacity opacity-30 hover:opacity-70 flex-shrink-0"
           style={{ color: isDark ? "#fff" : "#374151", touchAction: "none" }}
-          tabIndex={-1}
         >
           <GripVertical size={14} />
-        </button>
+        </div>
 
         {/* Color dot */}
         <span
@@ -407,13 +408,31 @@ const ListColumn = ({
             {cards.length === 0 && !showAddCard && (
               <div className="py-6 flex flex-col items-center justify-center text-center">
                 <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
-                  style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center mb-2 transition-all duration-200"
+                  style={{
+                    background: snapshot.isDraggingOver
+                      ? isDark ? "rgba(124,58,237,0.15)" : "rgba(124,58,237,0.10)"
+                      : isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+                  }}
                 >
-                  <Plus size={14} style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }} />
+                  <Plus
+                    size={14}
+                    style={{
+                      color: snapshot.isDraggingOver
+                        ? "#a78bfa"
+                        : isDark ? "rgba(255,255,255,0.20)" : "#d1d5db"
+                    }}
+                  />
                 </div>
-                <p className="text-xs" style={{ color: isDark ? "rgba(255,255,255,0.20)" : "#d1d5db" }}>
-                  {snapshot.isDraggingOver ? "Drop card here" : "No cards yet"}
+                <p
+                  className="text-xs transition-colors duration-200"
+                  style={{
+                    color: snapshot.isDraggingOver
+                      ? isDark ? "rgba(167,139,250,0.80)" : "rgba(124,58,237,0.70)"
+                      : isDark ? "rgba(255,255,255,0.20)" : "#d1d5db"
+                  }}
+                >
+                  {snapshot.isDraggingOver ? "Release to drop here" : "No cards yet — click to add one"}
                 </p>
               </div>
             )}
