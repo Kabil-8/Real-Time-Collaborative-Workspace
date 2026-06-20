@@ -44,7 +44,6 @@ router.patch(
   updateWorkspace
 );
 router.delete("/:workspaceId", archiveWorkspace);
-
 router.post(
   "/:workspaceId/invite",
   requireWorkspaceAdmin,
