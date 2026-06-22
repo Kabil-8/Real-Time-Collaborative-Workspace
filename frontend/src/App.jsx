@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { WorkspaceProvider } from "./context/WorkspaceContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./hooks/useToast";
+import ToastContainer from "./components/ui/Toast";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import AppShell from "./components/layout/AppShell";
 import HomePage from "./pages/HomePage";
@@ -108,11 +110,15 @@ const AppRoutes = () => (
 
 const App = () => (
   <ThemeProvider>
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+      {/* Global toast overlay — rendered once outside router */}
+      <ToastContainer />
+    </ToastProvider>
   </ThemeProvider>
 );
 
