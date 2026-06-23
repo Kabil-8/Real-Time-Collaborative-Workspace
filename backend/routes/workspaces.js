@@ -20,7 +20,6 @@ const {
 } = require("../middleware/auth");
 const { handleValidationErrors } = require("../middleware/validate");
 
-// All routes require authentication
 router.use(protect);
 
 router.post(
