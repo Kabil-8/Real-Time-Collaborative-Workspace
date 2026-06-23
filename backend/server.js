@@ -17,7 +17,6 @@ const boardRoutes = require("./routes/boards");
 const app = express();
 const httpServer = http.createServer(app);
 
-// Socket.io — wired up now, room logic comes in Week 3
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
