@@ -138,15 +138,23 @@ workspaceSchema.pre("save", function (next) {
 });
 
 // Helper: check if user is a member
+// Works whether m.user is a raw ObjectId OR a populated user object
 workspaceSchema.methods.isMember = function (userId) {
-  return this.members.some((m) => m.user.toString() === userId.toString());
+  const id = userId.toString();
+  return this.members.some((m) => {
+    const memberId = m.user?._id ? m.user._id.toString() : m.user.toString();
+    return memberId === id;
+  });
 };
 
 // Helper: get a member's role
+// Works whether m.user is a raw ObjectId OR a populated user object
 workspaceSchema.methods.getMemberRole = function (userId) {
-  const member = this.members.find(
-    (m) => m.user.toString() === userId.toString()
-  );
+  const id = userId.toString();
+  const member = this.members.find((m) => {
+    const memberId = m.user?._id ? m.user._id.toString() : m.user.toString();
+    return memberId === id;
+  });
   return member ? member.role : null;
 };
 

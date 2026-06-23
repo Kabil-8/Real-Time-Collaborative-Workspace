@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Search, Bell, Command, ChevronRight } from "lucide-react";
 import Sidebar, { Avatar } from "./Sidebar";
 import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal";
 import ThemeToggle from "./ThemeToggle";
+import SearchModal from "../ui/SearchModal";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
 
@@ -17,6 +18,9 @@ const Breadcrumb = () => {
 
   if (location.pathname === "/" || location.pathname === "/boards") {
     segments.push({ label: "Home", path: "/" });
+  } else if (location.pathname === "/search") {
+    segments.push({ label: "Home", path: "/" });
+    segments.push({ label: "Search", path: null });
   } else if (location.pathname.includes("/boards/")) {
     segments.push({ label: "Boards", path: "/boards" });
     segments.push({ label: "Board", path: null });
@@ -53,7 +57,21 @@ const Breadcrumb = () => {
 const AppShell = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const { user } = useAuth();
+
+  // ⌘K / Ctrl+K opens search
+  const openSearch = useCallback(() => setShowSearch(true), []);
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [openSearch]);
 
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
@@ -77,10 +95,14 @@ const AppShell = ({ children }) => {
           {/* Right actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Search chip */}
-            <button className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg
-              bg-slate-800/60 border border-slate-700/50 text-slate-500
-              hover:text-slate-300 hover:bg-slate-800 hover:border-slate-600
-              transition-all text-sm group">
+            <button
+              id="global-search-trigger"
+              onClick={openSearch}
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg
+                bg-slate-800/60 border border-slate-700/50 text-slate-500
+                hover:text-slate-300 hover:bg-slate-800 hover:border-slate-600
+                transition-all text-sm group"
+            >
               <Search size={13} />
               <span className="text-xs">Search…</span>
               <kbd className="ml-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md
@@ -120,6 +142,8 @@ const AppShell = ({ children }) => {
       {showCreateWorkspace && (
         <CreateWorkspaceModal onClose={() => setShowCreateWorkspace(false)} />
       )}
+
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </div>
   );
 };

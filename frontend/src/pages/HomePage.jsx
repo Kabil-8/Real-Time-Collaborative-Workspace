@@ -7,7 +7,6 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useTheme } from "../context/ThemeContext";
-import api from "../utils/api";
 
 const GRADIENTS = [
   "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -157,43 +156,34 @@ const useClock = () => {
 const HomePage = () => {
   const { isDark } = useTheme();
   const { user } = useAuth();
-  const { activeWorkspace, fetchWorkspaces } = useWorkspace();
+  const { activeWorkspace, fetchWorkspaces, boards, loadingBoards, fetchBoards, createBoard } = useWorkspace();
   const navigate = useNavigate();
   const now = useClock();
 
-  const [boards, setBoards]             = useState([]);
-  const [loadingBoards, setLoadingBoards] = useState(false);
   const [showCreateBoard, setShowCreateBoard] = useState(false);
   const [newBoardTitle, setNewBoardTitle]     = useState("");
   const [creating, setCreating]               = useState(false);
 
-  useEffect(() => { fetchWorkspaces(); }, []);
+  // Fetch workspaces once on mount (stable callback — no dep issues)
+  useEffect(() => { fetchWorkspaces(); }, [fetchWorkspaces]);
+
+  // Fetch boards whenever the active workspace changes
   useEffect(() => {
-    if (!activeWorkspace) return;
-    setLoadingBoards(true);
-    api.get(`/workspaces/${activeWorkspace._id}/boards`)
-      .then(({ data }) => setBoards(data.boards || []))
-      .catch(console.error)
-      .finally(() => setLoadingBoards(false));
-  }, [activeWorkspace]);
+    if (activeWorkspace?._id) fetchBoards(activeWorkspace._id);
+  }, [activeWorkspace?._id, fetchBoards]);
 
   const handleCreateBoard = async (e) => {
     e.preventDefault();
     if (!newBoardTitle.trim() || !activeWorkspace) return;
     setCreating(true);
-    try {
-      const { data } = await api.post("/boards", {
-        title: newBoardTitle.trim(),
-        workspaceId: activeWorkspace._id,
-      });
-      setBoards((prev) => [data.board, ...prev]);
+    const result = await createBoard(newBoardTitle.trim(), activeWorkspace._id);
+    if (result.success) {
       setNewBoardTitle("");
       setShowCreateBoard(false);
-    } catch (err) {
-      console.error("Failed to create board", err);
-    } finally {
-      setCreating(false);
+    } else {
+      console.error("Failed to create board", result.message);
     }
+    setCreating(false);
   };
 
   const firstName = user?.name?.split(" ")[0] || "there";

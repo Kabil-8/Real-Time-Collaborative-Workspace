@@ -12,6 +12,7 @@ import WorkspaceSettings from "./pages/WorkspaceSettings";
 import MembersPage from "./pages/MembersPage";
 import BoardPage from "./pages/BoardPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
+import SearchPage from "./pages/SearchPage";
 
 // ─── Branded loading screen ───────────────────────────────────────────────────
 const LoadingScreen = () => (
@@ -75,6 +76,14 @@ const AppRoutes = () => (
       <PrivateRoute>
         <WorkspaceProvider>
           <AppShell><HomePage /></AppShell>
+        </WorkspaceProvider>
+      </PrivateRoute>
+    } />
+
+    <Route path="/search" element={
+      <PrivateRoute>
+        <WorkspaceProvider>
+          <AppShell><SearchPage /></AppShell>
         </WorkspaceProvider>
       </PrivateRoute>
     } />

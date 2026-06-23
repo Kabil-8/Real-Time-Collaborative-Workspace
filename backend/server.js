@@ -14,6 +14,7 @@ const workspaceRoutes = require("./routes/workspaces");
 const boardRoutes = require("./routes/boards");
 const listRoutes = require("./routes/lists");
 const cardRoutes = require("./routes/cards");
+const searchRoutes = require("./routes/search");
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 const app = express();
@@ -67,6 +68,7 @@ app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/boards", boardRoutes);
 app.use("/api/lists", listRoutes);
 app.use("/api/cards", cardRoutes);
+app.use("/api/search", searchRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
