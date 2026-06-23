@@ -15,7 +15,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Verify token on mount
   useEffect(() => {
     const token = localStorage.getItem("zaalima_token");
     if (!token) {
