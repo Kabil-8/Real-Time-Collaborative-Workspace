@@ -14,6 +14,7 @@ const GRADIENTS = [
   "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
 ];
 
+
 const BoardCard = ({ board, onClick }) => (
   <button
     onClick={onClick}
@@ -98,6 +99,7 @@ const HomePage = () => {
   const firstName = user?.name?.split(" ")[0] || "there";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const starredBoards = boards.filter(board => board.isStarred).length;
 
   return (
     <div className="px-8 py-8 max-w-5xl mx-auto">
@@ -124,6 +126,12 @@ const HomePage = () => {
                 <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
                   {boards.length}
                 </span>
+                {starredBoards > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-yellow-300 bg-yellow-500/10 px-2 py-0.5 rounded-full">
+                    <Star size={11} className="fill-yellow-300" />
+                      {starredBoards}
+                        </span>
+                )}
               </div>
             </div>
 
@@ -177,7 +185,7 @@ const HomePage = () => {
             {[
               { label: "Boards", value: boards.length },
               { label: "Members", value: activeWorkspace.members?.length || 0 },
-              { label: "Active today", value: "—" },
+              { label: "Starred Boards", value: starredBoards },
             ].map(({ label, value }) => (
               <div key={label} className="bg-slate-900/60 border border-slate-800 rounded-2xl px-5 py-4">
                 <p className="text-2xl font-bold text-white">{value}</p>
