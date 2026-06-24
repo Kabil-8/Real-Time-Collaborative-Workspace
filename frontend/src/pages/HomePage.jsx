@@ -31,7 +31,8 @@ const BoardCard = ({ board, onClick }) => (
       </div>
       <div className="flex items-center gap-1.5 text-white/70 text-xs">
         <Clock size={11} />
-        <span>{new Date(board.lastActivity || board.updatedAt).toLocaleDateString()}</span>
+        <span>{new Date(board.lastActivity || board.updatedAt).toLocaleDateString()}</span>  
+        {board.visibility === "private" ? <Lock size={11} /> : <Users size={11} />}  
       </div>
     </div>
   </button>
@@ -51,7 +52,7 @@ const CreateBoardCard = ({ onClick }) => (
 
 const HomePage = () => {
   const { user } = useAuth();
-  const { activeWorkspace, fetchWorkspaces } = useWorkspace();
+  const { activeWorkspace, fetchWorkspaces, fetchworkspaceStats, workspaceStats, } = useWorkspace();
   const navigate = useNavigate();
 
   const [boards, setBoards] = useState([]);
@@ -67,11 +68,12 @@ const HomePage = () => {
   useEffect(() => {
     if (!activeWorkspace) return;
     setLoadingBoards(true);
+    fetchWorkspaceStats(activeWorkspace._id);
     api.get(`/workspaces/${activeWorkspace._id}/boards`)
       .then(({ data }) => setBoards(data.boards || []))
       .catch(console.error)
       .finally(() => setLoadingBoards(false));
-  }, [activeWorkspace]);
+  }, [activeWorkspace, fetchWorkspaceStats]);
 
   const handleCreateBoard = async (e) => {
     e.preventDefault();
@@ -83,6 +85,7 @@ const HomePage = () => {
         workspaceId: activeWorkspace._id,
       });
       setBoards((prev) => [data.board, ...prev]);
+      fetchWorkspaceStats(activeWorkspace._id);
       setNewBoardTitle("");
       setShowCreateBoard(false);
     } catch (err) {
