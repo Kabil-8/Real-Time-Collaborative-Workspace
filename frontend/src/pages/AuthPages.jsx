@@ -18,6 +18,15 @@ const InputField = ({ label, type, value, onChange, placeholder, error }) => (
   </div>
 );
 
+const getPasswordStrength = (password) => {
+  let score = 0;
+  if (password.length >= 6) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  return score;
+};
+
 const AuthShell = ({ title, subtitle, children }) => (
   <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
     {/* Ambient glow */}
@@ -81,6 +90,8 @@ export const LoginPage = () => {
   };
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const passwordStrength = getPasswordStrength(form.password);
+  const strengthLabel = ["Weak", "Weak", "Fair", "Good", "Strong"][passwordStrength];
 
   return (
     <AuthShell title="Welcome back" subtitle="Sign in to your workspace">
@@ -166,7 +177,16 @@ export const RegisterPage = () => {
           placeholder="you@company.com" error={errors.email} />
         <InputField label="Password" type="password" value={form.password} onChange={set("password")}
           placeholder="Min. 6 characters" error={errors.password} />
-
+        <div className="mb-5">
+          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div
+              className="h-full bg-violet-500 transition-all"
+              style={{ width: `${Math.max(passwordStrength, 1) * 25}%` }}
+            />
+          </div>
+          <p className="mt-1.5 text-xs text-slate-500">Password strength: {strengthLabel}</p>
+        </div>
+        
         <button
           type="submit"
           disabled={loading}
