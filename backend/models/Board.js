@@ -35,6 +35,11 @@ const boardSchema = new mongoose.Schema(
         default: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       },
     },
+    visibility: {
+      type: String,
+      enum: ["workspace", "private"],
+      default: "workspace",
+    },
     // Members can be a subset of workspace members
     members: [
       {
