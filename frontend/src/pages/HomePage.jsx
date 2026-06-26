@@ -4,7 +4,6 @@ import { Plus, Trello, Clock, Star } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWorkspace } from "../context/WorkspaceContext";
 import api from "../utils/api";
-
 const GRADIENTS = [
   "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
   "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
@@ -13,7 +12,6 @@ const GRADIENTS = [
   "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
   "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
 ];
-
 const BoardCard = ({ board, onClick }) => (
   <button
     onClick={onClick}
