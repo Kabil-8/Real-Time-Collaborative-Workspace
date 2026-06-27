@@ -1,16 +1,4 @@
-/**
- * socket/authMiddleware.js
- *
- * Socket.io middleware that authenticates every incoming connection
- * before the socket is accepted into the namespace.
- *
- * The client must supply a valid JWT either via:
- *   - socket.handshake.auth.token   (preferred — sent in the auth option)
- *   - socket.handshake.headers.authorization  (Bearer <token>)
- *
- * On success  → decoded user is attached as socket.user and next() is called.
- * On failure  → next(Error) rejects the connection with a 401 message.
- */
+
 
 const { verifyToken } = require("../utils/jwt");
 const User = require("../models/User");
