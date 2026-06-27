@@ -4,7 +4,6 @@ const User = require("../models/User");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
 
- ────────────────────────────────────────────────────────
 
 exports.createWorkspaceValidation = [
   body("name")
