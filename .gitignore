@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# npm logs
+npm-debug.log*
+
+# build folders
+build/
+dist/
+
+# cache
+.cache/
+.parcel-cache/
+
+# React
+frontend/node_modules/
+frontend/.cache/
+frontend/build/
+
+# Backend
+backend/node_modules/
+
+# Environment
+.env
+.env.local
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
