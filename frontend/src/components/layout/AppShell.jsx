@@ -5,7 +5,6 @@ import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal";
 const AppShell = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-
   return (
     <div className="flex h-screen bg-slate-950 overflow-hidden">
       <Sidebar
