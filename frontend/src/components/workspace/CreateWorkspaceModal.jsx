@@ -7,7 +7,6 @@ const COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6",
   "#f97316", "#eab308", "#22c55e", "#3b82f6",
 ];
-
 const CreateWorkspaceModal = ({ onClose }) => {
   const { createWorkspace } = useWorkspace();
   const [form, setForm] = useState({
