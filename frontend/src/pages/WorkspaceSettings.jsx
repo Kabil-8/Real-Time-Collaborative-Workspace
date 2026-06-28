@@ -7,7 +7,6 @@ import { Avatar } from "../components/layout/Sidebar";
 
 const ICONS = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
 const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
-
 const Section = ({ title, children }) => (
   <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
     <div className="px-6 py-4 border-b border-slate-800">
