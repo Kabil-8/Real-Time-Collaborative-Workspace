@@ -362,7 +362,7 @@ const HomePage = () => {
                 {[
                   { label: "Members",  desc: "Manage team & roles",         icon: Users,     path: `/workspace/${activeWorkspace._id}/members`,  color: "#6366f1", lightBg: "#f5f3ff" },
                   { label: "Settings", desc: "Workspace configuration",      icon: Sparkles,  path: `/workspace/${activeWorkspace._id}/settings`,  color: "#8b5cf6", lightBg: "#faf5ff" },
-                  { label: "Activity", desc: "Recent workspace activity",    icon: BarChart3, path: "/",                                          color: "#10b981", lightBg: "#f0fdf4" },
+                  { label: "Activity", desc: "Recent workspace activity",    icon: BarChart3, path: "/search",                                     color: "#10b981", lightBg: "#f0fdf4" },
                 ].map(({ label, desc, icon: Icon, path, color, lightBg }) => (
                   <button key={label} onClick={() => navigate(path)}
                     className="flex items-center gap-4 p-4 rounded-2xl text-left group
