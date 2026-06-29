@@ -3,6 +3,7 @@ const Card  = require("../models/Card");
 const List  = require("../models/List");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
+const { emitCardCreated } = require("../socket/emitters/cardEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,14 @@ exports.createCard = async (req, res, next) => {
     await board.save();
 
     const populated = await card.populate("assignees", "name avatar avatarColor");
-    return successResponse(res, { card: populated }, "Card created.", 201);
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { card: populated }, "Card created.", 201);
+
+    // ── Broadcast to all board room members (Day 3) ───────────────────────────
+    // Fire-and-forget: errors are caught inside emitCardCreated and never
+    // propagate back to the HTTP response cycle.
+    emitCardCreated(req.app, boardId, populated);
   } catch (err) {
     next(err);
   }
