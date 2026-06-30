@@ -7,6 +7,7 @@ const COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6",
   "#f97316", "#eab308", "#22c55e", "#3b82f6",
 ];
+
 const CreateWorkspaceModal = ({ onClose }) => {
   const { createWorkspace } = useWorkspace();
   const [form, setForm] = useState({
@@ -45,7 +46,6 @@ const CreateWorkspaceModal = ({ onClose }) => {
             <X size={18} />
           </button>
         </div>
-
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {error && (
             <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
