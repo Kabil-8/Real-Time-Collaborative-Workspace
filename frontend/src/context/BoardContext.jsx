@@ -32,6 +32,7 @@ import { moveCard, updateCard } from "../utils/cardsApi";
 import api from "../utils/api";
 import useOptimisticMutation from "../hooks/useOptimisticMutation";
 import { useToast } from "../hooks/useToast";
+import useSocket from "../hooks/useSocket";
 
 // ── Context ────────────────────────────────────────────────────────
 const BoardContext = createContext(null);
@@ -44,6 +45,9 @@ export const BoardProvider = ({ boardId, children }) => {
   const [lists,   setLists]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
+
+  // ── Socket connection for this board room ───────────────────────
+  const socket = useSocket(boardId);
 
   // Separate mutation trackers for lists vs cards
   const {
@@ -79,6 +83,30 @@ export const BoardProvider = ({ boardId, children }) => {
   }, [boardId]);
 
   useEffect(() => { loadBoard(); }, [loadBoard]);
+
+  // ── Real-time: card:updated ──────────────────────────────────────
+  // When another collaborator updates a card, merge the changes into
+  // local state so this client sees the update without a refresh.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCardUpdated = ({ boardId: eventBoardId, card }) => {
+      // Guard: only handle events for THIS board
+      if (eventBoardId !== boardId) return;
+
+      setLists((prev) =>
+        prev.map((l) => ({
+          ...l,
+          cardOrder: (l.cardOrder || []).map((c) =>
+            c._id === card._id ? { ...c, ...card } : c
+          ),
+        }))
+      );
+    };
+
+    socket.on("card:updated", handleCardUpdated);
+    return () => socket.off("card:updated", handleCardUpdated);
+  }, [socket, boardId]);
 
   // ── List handlers ───────────────────────────────────────────────
 

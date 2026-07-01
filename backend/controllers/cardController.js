@@ -3,7 +3,7 @@ const Card  = require("../models/Card");
 const List  = require("../models/List");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
-const { emitCardCreated } = require("../socket/emitters/cardEmitter");
+const { emitCardCreated, emitCardUpdated } = require("../socket/emitters/cardEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -210,7 +210,11 @@ exports.updateCard = async (req, res, next) => {
     // Bump board lastActivity
     await Board.findByIdAndUpdate(updated.board, { lastActivity: new Date() });
 
-    return successResponse(res, { card: updated }, "Card updated.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { card: updated }, "Card updated.");
+
+    // ── Broadcast to all board room members (Day 4) ───────────────────────────
+    emitCardUpdated(req.app, updated.board.toString(), updated);
   } catch (err) {
     next(err);
   }
