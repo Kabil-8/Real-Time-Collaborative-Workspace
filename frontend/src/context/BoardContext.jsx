@@ -84,6 +84,31 @@ export const BoardProvider = ({ boardId, children }) => {
 
   useEffect(() => { loadBoard(); }, [loadBoard]);
 
+  // ── Real-time: card:created ─────────────────────────────────────
+  // When another collaborator creates a card, append it to the
+  // correct list — deduplicated by _id so the creator's own tab
+  // (which already has the card from the optimistic update) is safe.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCardCreated = ({ boardId: eventBoardId, card }) => {
+      if (eventBoardId !== boardId) return;
+
+      setLists((prev) =>
+        prev.map((l) => {
+          if (l._id !== (card.list?._id || card.list)) return l;
+          // Deduplicate: skip if already present (optimistic creator)
+          const alreadyExists = (l.cardOrder || []).some((c) => c._id === card._id);
+          if (alreadyExists) return l;
+          return { ...l, cardOrder: [...(l.cardOrder || []), card] };
+        })
+      );
+    };
+
+    socket.on("card:created", handleCardCreated);
+    return () => socket.off("card:created", handleCardCreated);
+  }, [socket, boardId]);
+
   // ── Real-time: card:updated ──────────────────────────────────────
   // When another collaborator updates a card, merge the changes into
   // local state so this client sees the update without a refresh.
@@ -107,6 +132,58 @@ export const BoardProvider = ({ boardId, children }) => {
     socket.on("card:updated", handleCardUpdated);
     return () => socket.off("card:updated", handleCardUpdated);
   }, [socket, boardId]);
+
+  // ── Real-time: card:moved ────────────────────────────────────────
+  // When another collaborator moves a card (drag-and-drop or modal),
+  // surgically splice it out of the source list and insert it at the
+  // correct position in the destination list.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCardMoved = ({ boardId: eventBoardId, cardId, sourceListId, destListId, newPosition, card }) => {
+      if (eventBoardId !== boardId) return;
+
+      setLists((prev) => {
+        // Find the card object from any list (prefer the broadcast card)
+        let movedCard = card;
+        if (!movedCard) {
+          for (const l of prev) {
+            const found = (l.cardOrder || []).find((c) => c._id === cardId);
+            if (found) { movedCard = found; break; }
+          }
+        }
+        if (!movedCard) return prev; // nothing to do
+
+        const isCross = sourceListId !== destListId;
+
+        return prev.map((l) => {
+          // Remove from source
+          if (l._id === sourceListId) {
+            const filtered = (l.cardOrder || []).filter((c) => c._id !== cardId);
+            if (!isCross) {
+              // Same-list reorder: insert at new position
+              const clamped = Math.min(newPosition, filtered.length);
+              filtered.splice(clamped, 0, { ...movedCard, list: destListId });
+              return { ...l, cardOrder: filtered };
+            }
+            return { ...l, cardOrder: filtered };
+          }
+          // Insert into dest (cross-list move only)
+          if (isCross && l._id === destListId) {
+            const destCards = (l.cardOrder || []).filter((c) => c._id !== cardId);
+            const clamped = Math.min(newPosition, destCards.length);
+            destCards.splice(clamped, 0, { ...movedCard, list: destListId });
+            return { ...l, cardOrder: destCards };
+          }
+          return l;
+        });
+      });
+    };
+
+    socket.on("card:moved", handleCardMoved);
+    return () => socket.off("card:moved", handleCardMoved);
+  }, [socket, boardId]);
+
 
   // ── List handlers ───────────────────────────────────────────────
 

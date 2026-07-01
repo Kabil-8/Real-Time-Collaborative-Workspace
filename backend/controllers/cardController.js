@@ -3,7 +3,7 @@ const Card  = require("../models/Card");
 const List  = require("../models/List");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
-const { emitCardCreated, emitCardUpdated } = require("../socket/emitters/cardEmitter");
+const { emitCardCreated, emitCardUpdated, emitCardMoved } = require("../socket/emitters/cardEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -298,7 +298,19 @@ exports.moveCard = async (req, res, next) => {
 
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
 
-    return successResponse(res, { card }, "Card moved.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { card }, "Card moved.");
+
+    // ── Broadcast to all board room members (Day 5) ───────────────────────────
+    // Payload gives the frontend enough info to surgically reorder state
+    // without a full board reload.
+    emitCardMoved(req.app, card.board.toString(), {
+      cardId:       card._id.toString(),
+      sourceListId,
+      destListId,
+      newPosition:  clamped,
+      card,
+    });
   } catch (err) {
     next(err);
   }
