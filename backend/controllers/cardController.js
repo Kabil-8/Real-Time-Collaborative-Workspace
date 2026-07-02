@@ -3,7 +3,14 @@ const Card  = require("../models/Card");
 const List  = require("../models/List");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
-const { emitCardCreated, emitCardUpdated, emitCardMoved } = require("../socket/emitters/cardEmitter");
+const {
+  emitCardCreated,
+  emitCardUpdated,
+  emitCardMoved,
+  emitCardArchived,
+  emitCardRestored,
+  emitCardDuplicated,
+} = require("../socket/emitters/cardEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,10 +124,10 @@ exports.createCard = async (req, res, next) => {
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: populated }, "Card created.", 201);
 
-    // ── Broadcast to all board room members (Day 3) ───────────────────────────
-    // Fire-and-forget: errors are caught inside emitCardCreated and never
-    // propagate back to the HTTP response cycle.
-    emitCardCreated(req.app, boardId, populated);
+    // ── Broadcast to all board room members ───────────────────────────────────
+    // originSocketId lets the emitting client skip its own optimistic card.
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardCreated(req.app, boardId, populated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -213,8 +220,9 @@ exports.updateCard = async (req, res, next) => {
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: updated }, "Card updated.");
 
-    // ── Broadcast to all board room members (Day 4) ───────────────────────────
-    emitCardUpdated(req.app, updated.board.toString(), updated);
+    // ── Broadcast to all board room members ───────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardUpdated(req.app, updated.board.toString(), updated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -301,16 +309,20 @@ exports.moveCard = async (req, res, next) => {
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card }, "Card moved.");
 
-    // ── Broadcast to all board room members (Day 5) ───────────────────────────
-    // Payload gives the frontend enough info to surgically reorder state
-    // without a full board reload.
-    emitCardMoved(req.app, card.board.toString(), {
-      cardId:       card._id.toString(),
-      sourceListId,
-      destListId,
-      newPosition:  clamped,
-      card,
-    });
+    // ── Broadcast to all board room members ───────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardMoved(
+      req.app,
+      card.board.toString(),
+      {
+        cardId:      card._id.toString(),
+        sourceListId,
+        destListId,
+        newPosition: clamped,
+        card,
+      },
+      originSocketId
+    );
   } catch (err) {
     next(err);
   }
@@ -352,7 +364,13 @@ exports.duplicateCard = async (req, res, next) => {
     await List.findByIdAndUpdate(source.list, { $push: { cardOrder: newCard._id } });
 
     const populated = await newCard.populate("assignees", "name avatar avatarColor");
-    return successResponse(res, { card: populated }, "Card duplicated.", 201);
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { card: populated }, "Card duplicated.", 201);
+
+    // ── Broadcast duplicated card to room ─────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardDuplicated(req.app, source.board.toString(), populated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -598,6 +616,9 @@ exports.archiveCard = async (req, res, next) => {
     const { error, status } = await assertBoardMember(card.board, req.user._id);
     if (error) return errorResponse(res, error, status);
 
+    const listId = card.list.toString();
+    const boardId = card.board.toString();
+
     card.isArchived = true;
     await card.save();
 
@@ -605,7 +626,12 @@ exports.archiveCard = async (req, res, next) => {
     await List.findByIdAndUpdate(card.list, { $pull: { cardOrder: card._id } });
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
 
-    return successResponse(res, {}, "Card archived.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, {}, "Card archived.");
+
+    // ── Broadcast archive event to room ──────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardArchived(req.app, boardId, card._id.toString(), listId, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -631,7 +657,14 @@ exports.restoreCard = async (req, res, next) => {
     await List.findByIdAndUpdate(card.list, { $push: { cardOrder: card._id } });
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
 
-    return successResponse(res, { card }, "Card restored.");
+    const populated = await card.populate("assignees", "name avatar avatarColor");
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { card: populated }, "Card restored.");
+
+    // ── Broadcast restore event to room ──────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCardRestored(req.app, card.board.toString(), populated, originSocketId);
   } catch (err) {
     next(err);
   }

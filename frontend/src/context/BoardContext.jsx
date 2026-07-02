@@ -3,20 +3,18 @@
  * ─────────────────────────────────────────────────────────────────
  * Central state for a single Kanban board.
  *
- * Provides:
- *  - lists / setLists
- *  - board / setBoard
- *  - pendingListIds, pendingCardIds   (Sets for loading indicators)
- *  - Optimistic action dispatchers:
- *      optimisticRenameList(listId, newTitle)
- *      optimisticSetWipLimit(listId, wipLimit)
- *      optimisticAddCard(listId, tempCard)  → resolves with real card
- *      optimisticMoveCard(cardId, src, dest, sourceListId, destListId)
- *      optimisticArchiveCard(cardId, listId)
- *      optimisticUpdateCard(cardId, patch)   — for modal field edits
- *      optimisticMoveList(fromIdx, toIdx, listId)
- *  - toast helper (via useToast)
- *  - loadBoard() to hard-refresh from server
+ * Real-time events handled (Day 3-5 complete):
+ *   card:created    card:updated    card:moved
+ *   card:archived   card:restored   card:duplicated
+ *   list:created    list:updated    list:archived
+ *   list:restored   list:duplicated list:reordered
+ *
+ * Self-deduplication:
+ *   Every Axios request carries `x-socket-id` (injected by an
+ *   interceptor below).  The backend writes that value into every
+ *   socket payload as `originSocketId`.  When a client receives
+ *   an event whose `originSocketId === socket.id`, it skips the
+ *   handler — its own optimistic update already applied the change.
  */
 
 import React, {
@@ -47,18 +45,28 @@ export const BoardProvider = ({ boardId, children }) => {
   const [error,   setError]   = useState("");
 
   // ── Socket connection for this board room ───────────────────────
-  const socket = useSocket(boardId);
+  const { socket, socketId } = useSocket(boardId);
+
+  // Keep a ref so Axios interceptors added inside effects can always
+  // read the current socket id without re-registering.
+  const socketIdRef = useRef(socketId);
+  useEffect(() => { socketIdRef.current = socketId; }, [socketId]);
+
+  // ── Inject x-socket-id into every Axios request ────────────────
+  // The backend reads this header and echoes it back as originSocketId
+  // so each client can skip its own optimistic events.
+  useEffect(() => {
+    const interceptorId = api.interceptors.request.use((config) => {
+      const sid = socketIdRef.current;
+      if (sid) config.headers["x-socket-id"] = sid;
+      return config;
+    });
+    return () => api.interceptors.request.eject(interceptorId);
+  }, []); // runs once per BoardProvider mount
 
   // Separate mutation trackers for lists vs cards
-  const {
-    mutate: mutateList,
-    pendingIds: pendingListIds,
-  } = useOptimisticMutation();
-
-  const {
-    mutate: mutateCard,
-    pendingIds: pendingCardIds,
-  } = useOptimisticMutation();
+  const { mutate: mutateList, pendingIds: pendingListIds } = useOptimisticMutation();
+  const { mutate: mutateCard, pendingIds: pendingCardIds  } = useOptimisticMutation();
 
   // Always-fresh ref to avoid stale closures in DnD callbacks
   const listsRef = useRef(lists);
@@ -84,41 +92,40 @@ export const BoardProvider = ({ boardId, children }) => {
 
   useEffect(() => { loadBoard(); }, [loadBoard]);
 
-  // ── Real-time: card:created ─────────────────────────────────────
-  // When another collaborator creates a card, append it to the
-  // correct list — deduplicated by _id so the creator's own tab
-  // (which already has the card from the optimistic update) is safe.
+  // ── Helper: is this event from ourselves? ───────────────────────
+  // If yes, skip — the optimistic update already handled it.
+  const isSelf = useCallback(
+    (originSocketId) => !!originSocketId && originSocketId === socketIdRef.current,
+    []
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  CARD SOCKET HANDLERS
+  // ════════════════════════════════════════════════════════════════
+
+  // ── card:created ─────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
-
-    const handleCardCreated = ({ boardId: eventBoardId, card }) => {
-      if (eventBoardId !== boardId) return;
-
+    const handler = ({ boardId: eid, card, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
       setLists((prev) =>
         prev.map((l) => {
           if (l._id !== (card.list?._id || card.list)) return l;
-          // Deduplicate: skip if already present (optimistic creator)
-          const alreadyExists = (l.cardOrder || []).some((c) => c._id === card._id);
-          if (alreadyExists) return l;
+          const exists = (l.cardOrder || []).some((c) => c._id === card._id);
+          if (exists) return l;
           return { ...l, cardOrder: [...(l.cardOrder || []), card] };
         })
       );
     };
+    socket.on("card:created", handler);
+    return () => socket.off("card:created", handler);
+  }, [socket, boardId, isSelf]);
 
-    socket.on("card:created", handleCardCreated);
-    return () => socket.off("card:created", handleCardCreated);
-  }, [socket, boardId]);
-
-  // ── Real-time: card:updated ──────────────────────────────────────
-  // When another collaborator updates a card, merge the changes into
-  // local state so this client sees the update without a refresh.
+  // ── card:updated ─────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
-
-    const handleCardUpdated = ({ boardId: eventBoardId, card }) => {
-      // Guard: only handle events for THIS board
-      if (eventBoardId !== boardId) return;
-
+    const handler = ({ boardId: eid, card, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
       setLists((prev) =>
         prev.map((l) => ({
           ...l,
@@ -128,23 +135,16 @@ export const BoardProvider = ({ boardId, children }) => {
         }))
       );
     };
+    socket.on("card:updated", handler);
+    return () => socket.off("card:updated", handler);
+  }, [socket, boardId, isSelf]);
 
-    socket.on("card:updated", handleCardUpdated);
-    return () => socket.off("card:updated", handleCardUpdated);
-  }, [socket, boardId]);
-
-  // ── Real-time: card:moved ────────────────────────────────────────
-  // When another collaborator moves a card (drag-and-drop or modal),
-  // surgically splice it out of the source list and insert it at the
-  // correct position in the destination list.
+  // ── card:moved ───────────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
-
-    const handleCardMoved = ({ boardId: eventBoardId, cardId, sourceListId, destListId, newPosition, card }) => {
-      if (eventBoardId !== boardId) return;
-
+    const handler = ({ boardId: eid, cardId, sourceListId, destListId, newPosition, card, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
       setLists((prev) => {
-        // Find the card object from any list (prefer the broadcast card)
         let movedCard = card;
         if (!movedCard) {
           for (const l of prev) {
@@ -152,42 +152,181 @@ export const BoardProvider = ({ boardId, children }) => {
             if (found) { movedCard = found; break; }
           }
         }
-        if (!movedCard) return prev; // nothing to do
+        if (!movedCard) return prev;
 
         const isCross = sourceListId !== destListId;
-
         return prev.map((l) => {
-          // Remove from source
           if (l._id === sourceListId) {
             const filtered = (l.cardOrder || []).filter((c) => c._id !== cardId);
             if (!isCross) {
-              // Same-list reorder: insert at new position
               const clamped = Math.min(newPosition, filtered.length);
               filtered.splice(clamped, 0, { ...movedCard, list: destListId });
               return { ...l, cardOrder: filtered };
             }
             return { ...l, cardOrder: filtered };
           }
-          // Insert into dest (cross-list move only)
           if (isCross && l._id === destListId) {
-            const destCards = (l.cardOrder || []).filter((c) => c._id !== cardId);
-            const clamped = Math.min(newPosition, destCards.length);
-            destCards.splice(clamped, 0, { ...movedCard, list: destListId });
-            return { ...l, cardOrder: destCards };
+            const dest = (l.cardOrder || []).filter((c) => c._id !== cardId);
+            const clamped = Math.min(newPosition, dest.length);
+            dest.splice(clamped, 0, { ...movedCard, list: destListId });
+            return { ...l, cardOrder: dest };
           }
           return l;
         });
       });
     };
+    socket.on("card:moved", handler);
+    return () => socket.off("card:moved", handler);
+  }, [socket, boardId, isSelf]);
 
-    socket.on("card:moved", handleCardMoved);
-    return () => socket.off("card:moved", handleCardMoved);
-  }, [socket, boardId]);
+  // ── card:archived ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, cardId, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) =>
+        prev.map((l) => ({
+          ...l,
+          cardOrder: (l.cardOrder || []).filter((c) => c._id !== cardId),
+        }))
+      );
+    };
+    socket.on("card:archived", handler);
+    return () => socket.off("card:archived", handler);
+  }, [socket, boardId, isSelf]);
 
+  // ── card:restored ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, card, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      // Append to the target list (deduplicated)
+      setLists((prev) =>
+        prev.map((l) => {
+          if (l._id !== (card.list?._id || card.list)) return l;
+          const exists = (l.cardOrder || []).some((c) => c._id === card._id);
+          if (exists) return l;
+          return { ...l, cardOrder: [...(l.cardOrder || []), card] };
+        })
+      );
+    };
+    socket.on("card:restored", handler);
+    return () => socket.off("card:restored", handler);
+  }, [socket, boardId, isSelf]);
 
-  // ── List handlers ───────────────────────────────────────────────
+  // ── card:duplicated ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, card, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) =>
+        prev.map((l) => {
+          if (l._id !== (card.list?._id || card.list)) return l;
+          const exists = (l.cardOrder || []).some((c) => c._id === card._id);
+          if (exists) return l;
+          return { ...l, cardOrder: [...(l.cardOrder || []), card] };
+        })
+      );
+    };
+    socket.on("card:duplicated", handler);
+    return () => socket.off("card:duplicated", handler);
+  }, [socket, boardId, isSelf]);
 
-  /** Optimistically rename a list; rolls back on server error. */
+  // ════════════════════════════════════════════════════════════════
+  //  LIST SOCKET HANDLERS
+  // ════════════════════════════════════════════════════════════════
+
+  // ── list:created ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, list, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) => {
+        const exists = prev.some((l) => l._id === list._id);
+        if (exists) return prev;
+        return [...prev, { ...list, cardOrder: list.cardOrder || [] }];
+      });
+    };
+    socket.on("list:created", handler);
+    return () => socket.off("list:created", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ── list:updated ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, list, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) =>
+        prev.map((l) => (l._id === list._id ? { ...l, ...list } : l))
+      );
+    };
+    socket.on("list:updated", handler);
+    return () => socket.off("list:updated", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ── list:archived ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, listId, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) => prev.filter((l) => l._id !== listId));
+    };
+    socket.on("list:archived", handler);
+    return () => socket.off("list:archived", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ── list:restored ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, list, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) => {
+        const exists = prev.some((l) => l._id === list._id);
+        if (exists) return prev;
+        return [...prev, list];
+      });
+    };
+    socket.on("list:restored", handler);
+    return () => socket.off("list:restored", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ── list:duplicated ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, list, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) => {
+        const exists = prev.some((l) => l._id === list._id);
+        if (exists) return prev;
+        return [...prev, list];
+      });
+    };
+    socket.on("list:duplicated", handler);
+    return () => socket.off("list:duplicated", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ── list:reordered ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, listId, fromIndex, toIndex, originSocketId }) => {
+      if (eid !== boardId || isSelf(originSocketId)) return;
+      setLists((prev) => {
+        const idx = prev.findIndex((l) => l._id === listId);
+        if (idx === -1) return prev;
+        const reordered = Array.from(prev);
+        const [removed] = reordered.splice(idx, 1);
+        reordered.splice(toIndex, 0, removed);
+        return reordered;
+      });
+    };
+    socket.on("list:reordered", handler);
+    return () => socket.off("list:reordered", handler);
+  }, [socket, boardId, isSelf]);
+
+  // ════════════════════════════════════════════════════════════════
+  //  LIST MUTATION DISPATCHERS
+  // ════════════════════════════════════════════════════════════════
+
   const optimisticRenameList = useCallback(
     (listId, newTitle) => {
       mutateList({
@@ -195,9 +334,7 @@ export const BoardProvider = ({ boardId, children }) => {
         getSnapshot: () => listsRef.current,
         optimisticUpdate: () =>
           setLists((prev) =>
-            prev.map((l) =>
-              l._id === listId ? { ...l, title: newTitle } : l
-            )
+            prev.map((l) => (l._id === listId ? { ...l, title: newTitle } : l))
           ),
         mutationFn: () => updateList(listId, { title: newTitle }),
         onSuccess: (updated) =>
@@ -213,7 +350,6 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateList, toast]
   );
 
-  /** Optimistically set WIP limit; rolls back on server error. */
   const optimisticSetWipLimit = useCallback(
     (listId, wipLimit) => {
       mutateList({
@@ -221,9 +357,7 @@ export const BoardProvider = ({ boardId, children }) => {
         getSnapshot: () => listsRef.current,
         optimisticUpdate: () =>
           setLists((prev) =>
-            prev.map((l) =>
-              l._id === listId ? { ...l, wipLimit } : l
-            )
+            prev.map((l) => (l._id === listId ? { ...l, wipLimit } : l))
           ),
         mutationFn: () => updateList(listId, { wipLimit }),
         onSuccess: (updated) =>
@@ -239,10 +373,9 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateList, toast]
   );
 
-  /** Add card with temp optimistic entry; replaced by server card on success. */
   const optimisticAddCard = useCallback(
     (listId, tempCard, createFn) => {
-      const tempId = tempCard._id; // caller supplies a temp _id
+      const tempId = tempCard._id;
       mutateCard({
         entityId: tempId,
         getSnapshot: () => listsRef.current,
@@ -256,7 +389,6 @@ export const BoardProvider = ({ boardId, children }) => {
           ),
         mutationFn: createFn,
         onSuccess: (realCard) => {
-          // Swap temp card for real server card
           setLists((prev) =>
             prev.map((l) =>
               l._id === listId
@@ -280,7 +412,6 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateCard, toast]
   );
 
-  /** Optimistic card field update (title, priority, dueDate, etc.). */
   const optimisticUpdateCard = useCallback(
     (cardId, patch) => {
       mutateCard({
@@ -314,7 +445,6 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateCard, toast]
   );
 
-  /** Optimistic card archive (remove from UI immediately). */
   const optimisticArchiveCard = useCallback(
     (cardId, confirmFn) => {
       mutateCard({
@@ -338,7 +468,6 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateCard, toast]
   );
 
-  /** Optimistic list reorder (DnD). */
   const optimisticMoveList = useCallback(
     (fromIdx, toIdx, listId) => {
       const snapshot = listsRef.current;
@@ -359,7 +488,6 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateList, toast]
   );
 
-  /** Optimistic card move (DnD or modal). */
   const optimisticMoveCard = useCallback(
     (movedCard, sourceListId, destListId, sourceIdx, destIdx) => {
       const snapshot = listsRef.current;
@@ -370,7 +498,6 @@ export const BoardProvider = ({ boardId, children }) => {
 
       const sourceCards = Array.from(sourceList.cardOrder || []);
       const [card] = sourceCards.splice(sourceIdx, 1);
-
       const isCross = sourceListId !== destListId;
 
       let newLists;
@@ -407,7 +534,7 @@ export const BoardProvider = ({ boardId, children }) => {
     [mutateCard, toast]
   );
 
-  // ── Card list-level helpers (used by BoardPage legacy handlers) ──
+  // ── Legacy helpers (used by BoardPage / ListColumn) ─────────────
   const handleListAdded      = useCallback((nl)  => setLists((prev) => [...prev, { ...nl, cardOrder: [] }]), []);
   const handleListDeleted    = useCallback((id)  => setLists((prev) => prev.filter((l) => l._id !== id)), []);
   const handleListUpdated    = useCallback((upd) => setLists((prev) => prev.map((l) => l._id === upd._id ? { ...l, ...upd } : l)), []);
@@ -474,6 +601,9 @@ export const BoardProvider = ({ boardId, children }) => {
         loadBoard,
         listsRef,
 
+        // Presence
+        socketId,
+
         // Pending indicators
         pendingListIds,
         pendingCardIds,
@@ -487,7 +617,7 @@ export const BoardProvider = ({ boardId, children }) => {
         optimisticMoveList,
         optimisticMoveCard,
 
-        // Legacy handlers (still used for duplicate/restore flows)
+        // Legacy handlers (duplicate/restore flows)
         handleListAdded,
         handleListDeleted,
         handleListUpdated,

@@ -3,6 +3,14 @@ const List  = require("../models/List");
 const Card  = require("../models/Card");
 const Board = require("../models/Board");
 const { successResponse, errorResponse } = require("../utils/response");
+const {
+  emitListCreated,
+  emitListUpdated,
+  emitListArchived,
+  emitListRestored,
+  emitListDuplicated,
+  emitListReordered,
+} = require("../socket/emitters/listEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -69,7 +77,12 @@ exports.createList = async (req, res, next) => {
     board.lastActivity = new Date();
     await board.save();
 
-    return successResponse(res, { list }, "List created.", 201);
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { list }, "List created.", 201);
+
+    // ── Broadcast to all board room members ───────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListCreated(req.app, boardId, list, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -149,7 +162,12 @@ exports.updateList = async (req, res, next) => {
       runValidators: true,
     });
 
-    return successResponse(res, { list: updated }, "List updated.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { list: updated }, "List updated.");
+
+    // ── Broadcast to all board room members ───────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListUpdated(req.app, list.board.toString(), updated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -191,7 +209,12 @@ exports.moveList = async (req, res, next) => {
       lastActivity: new Date(),
     });
 
-    return successResponse(res, {}, "List moved.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, {}, "List moved.");
+
+    // ── Broadcast reorder to board room ─────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListReordered(req.app, boardId.toString(), list._id.toString(), list.position, clamped, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -222,7 +245,12 @@ exports.archiveList = async (req, res, next) => {
       lastActivity: new Date(),
     });
 
-    return successResponse(res, {}, "List archived.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, {}, "List archived.");
+
+    // ── Broadcast archive to board room ─────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListArchived(req.app, list.board.toString(), list._id.toString(), originSocketId);
   } catch (err) {
     next(err);
   }
@@ -254,7 +282,19 @@ exports.restoreList = async (req, res, next) => {
     board.lastActivity = new Date();
     await board.save();
 
-    return successResponse(res, { list }, "List restored.");
+    const populated = await List.findById(list._id).populate({
+      path: "cardOrder",
+      match: { isArchived: false },
+      select: "title priority dueDate assignees coverColor labels position",
+      populate: { path: "assignees", select: "name avatar avatarColor" },
+    });
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { list: populated }, "List restored.");
+
+    // ── Broadcast restore to board room ─────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListRestored(req.app, list.board.toString(), populated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -325,7 +365,12 @@ exports.duplicateList = async (req, res, next) => {
       populate: { path: "assignees", select: "name avatar avatarColor" },
     });
 
-    return successResponse(res, { list: populated }, "List duplicated.", 201);
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { list: populated }, "List duplicated.", 201);
+
+    // ── Broadcast duplicated list to board room ──────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitListDuplicated(req.app, source.board.toString(), populated, originSocketId);
   } catch (err) {
     next(err);
   }
