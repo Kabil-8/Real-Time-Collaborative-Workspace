@@ -6,7 +6,6 @@ import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import AppShell from "./components/layout/AppShell";
 import HomePage from "./pages/HomePage";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
-
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
