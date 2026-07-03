@@ -8,6 +8,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useBoardContext } from "../../context/BoardContext";
 import { archiveList, duplicateList } from "../../utils/listsApi";
 import { createCard } from "../../utils/cardsApi";
+import TypingBadge from "../ui/TypingBadge";
 
 // Column accent colors by index
 const COLUMN_COLORS = [
@@ -65,6 +66,9 @@ const ListColumn = ({
     optimisticAddCard,
     pendingListIds,
     pendingCardIds,
+    emitTyping,
+    emitStopTyping,
+    getTypistsFor,
   } = useBoardContext();
 
   const isListPending = pendingListIds.has(list._id);
@@ -94,6 +98,9 @@ const ListColumn = ({
     e.preventDefault();
     const trimmed = cardTitle.trim();
     if (!trimmed) return;
+
+    // Stop typing indicator immediately on submit
+    emitStopTyping("list_add_card", list._id);
 
     // Build a temp card with a negative ID so it's visually distinct
     const tempId = `temp-${Date.now()}`;
@@ -139,6 +146,7 @@ const ListColumn = ({
   const saveRename = () => {
     const trimmed = renameVal.trim();
     setRenaming(false);
+    emitStopTyping("list_rename", list._id);
     if (!trimmed || trimmed === list.title) return;
     optimisticRenameList(list._id, trimmed);
   };
@@ -234,11 +242,14 @@ const ListColumn = ({
           <input
             ref={renameRef}
             value={renameVal}
-            onChange={(e) => setRenameVal(e.target.value)}
+            onChange={(e) => {
+              setRenameVal(e.target.value);
+              emitTyping("list_rename", list._id);
+            }}
             onBlur={saveRename}
             onKeyDown={(e) => {
               if (e.key === "Enter")  saveRename();
-              if (e.key === "Escape") { setRenaming(false); setRenameVal(list.title); }
+              if (e.key === "Escape") { setRenaming(false); setRenameVal(list.title); emitStopTyping("list_rename", list._id); }
             }}
             className="flex-1 bg-transparent outline-none text-sm font-bold border-b"
             style={{ borderColor: accentColor, color: headerTxt }}
@@ -256,6 +267,15 @@ const ListColumn = ({
 
         {/* Pending dot — visible while mutation in-flight */}
         {isListPending && <PendingDot />}
+
+        {/* Typing indicator — visible when remote users are typing in this list */}
+        <TypingBadge
+          compact
+          typists={[
+            ...getTypistsFor("list_add_card", list._id),
+            ...getTypistsFor("list_rename", list._id),
+          ].filter((t, i, arr) => arr.findIndex(x => x.userId === t.userId) === i)}
+        />
 
         {/* Card count / WIP badge */}
         <span
@@ -469,10 +489,14 @@ const ListColumn = ({
             <textarea
               autoFocus
               value={cardTitle}
-              onChange={(e) => setCardTitle(e.target.value)}
+              onChange={(e) => {
+                setCardTitle(e.target.value);
+                emitTyping("list_add_card", list._id);
+              }}
+              onBlur={() => emitStopTyping("list_add_card", list._id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddCard(e); }
-                if (e.key === "Escape") { setShowAddCard(false); setCardTitle(""); }
+                if (e.key === "Escape") { setShowAddCard(false); setCardTitle(""); emitStopTyping("list_add_card", list._id); }
               }}
               placeholder="Card title…"
               rows={2}

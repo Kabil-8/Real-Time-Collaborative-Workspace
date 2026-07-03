@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useBoardContext } from "../../context/BoardContext";
 import * as cardsApi from "../../utils/cardsApi";
 import { fetchListsByBoard } from "../../utils/listsApi";
+import TypingBadge from "../ui/TypingBadge";
 
 const PRIORITY_OPTIONS = [
   { value: "none",     label: "None",     color: "#6b7280" },
@@ -56,7 +57,7 @@ const SavingIndicator = ({ visible }) => {
 const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const { isDark } = useTheme();
   const { user }   = useAuth();
-  const { optimisticUpdateCard, optimisticArchiveCard, pendingCardIds } = useBoardContext();
+  const { optimisticUpdateCard, optimisticArchiveCard, pendingCardIds, emitTyping, emitStopTyping, getTypistsFor } = useBoardContext();
 
   const [card, setCard]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +129,7 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   /* ── Title (debounced, 400ms) ── */
   const handleTitleChange = (val) => {
     setTitleVal(val);
+    emitTyping("card_title", null, cardId);
     clearTimeout(titleDebRef.current);
     titleDebRef.current = setTimeout(() => {
       if (!val.trim() || val === card?.title) return;
@@ -138,6 +140,7 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const saveTitle = () => {
     clearTimeout(titleDebRef.current);
     setEditTitle(false);
+    emitStopTyping("card_title", null, cardId);
     if (!titleVal.trim() || titleVal === card?.title) return;
     optimisticField("title", titleVal.trim(), () => cardsApi.updateCard(cardId, { title: titleVal.trim() }));
   };
@@ -145,6 +148,7 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   /* ── Description (debounced, 400ms) ── */
   const handleDescChange = (val) => {
     setDescVal(val);
+    emitTyping("card_desc", null, cardId);
     clearTimeout(descDebRef.current);
     descDebRef.current = setTimeout(() => {
       optimisticField("description", val, () => cardsApi.updateCard(cardId, { description: val }));
@@ -154,6 +158,7 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const saveDesc = () => {
     clearTimeout(descDebRef.current);
     setEditDesc(false);
+    emitStopTyping("card_desc", null, cardId);
     optimisticField("description", descVal, () => cardsApi.updateCard(cardId, { description: descVal }));
   };
 
@@ -284,7 +289,7 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
             <input autoFocus value={titleVal}
               onChange={e => handleTitleChange(e.target.value)}
               onBlur={saveTitle}
-              onKeyDown={e => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") setEditTitle(false); }}
+              onKeyDown={e => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") { setEditTitle(false); emitStopTyping("card_title", null, cardId); } }}
               className={`${iCls} flex-1 text-base font-semibold`} style={iStyle} />
           ) : (
             <h2 onClick={() => { if (!loading) setEditTitle(true); }}
@@ -304,6 +309,19 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
             <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: sub }}><X size={16} /></button>
           </div>
         </div>
+
+        {/* Remote typing indicator strip */}
+        {(() => {
+          const remoteTypists = [
+            ...getTypistsFor("card_title", null, cardId),
+            ...getTypistsFor("card_desc",  null, cardId),
+          ].filter((t, i, arr) => arr.findIndex(x => x.userId === t.userId) === i);
+          return remoteTypists.length > 0 ? (
+            <div className="px-5 pb-1">
+              <TypingBadge typists={remoteTypists} />
+            </div>
+          ) : null;
+        })()}
 
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-violet-400" /></div>

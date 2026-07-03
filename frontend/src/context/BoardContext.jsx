@@ -31,6 +31,7 @@ import api from "../utils/api";
 import useOptimisticMutation from "../hooks/useOptimisticMutation";
 import { useToast } from "../hooks/useToast";
 import useSocket from "../hooks/useSocket";
+import useTypingIndicator from "../hooks/useTypingIndicator";
 
 // ── Context ────────────────────────────────────────────────────────
 const BoardContext = createContext(null);
@@ -46,6 +47,9 @@ export const BoardProvider = ({ boardId, children }) => {
 
   // ── Socket connection for this board room ───────────────────────
   const { socket, socketId } = useSocket(boardId);
+
+  // ── Typing indicators ──────────────────────────────────────────
+  const { emitTyping, emitStopTyping, getTypistsFor } = useTypingIndicator(socket, boardId);
 
   // Keep a ref so Axios interceptors added inside effects can always
   // read the current socket id without re-registering.
@@ -607,6 +611,11 @@ export const BoardProvider = ({ boardId, children }) => {
         // Pending indicators
         pendingListIds,
         pendingCardIds,
+
+        // Typing indicators (Day 6-7)
+        emitTyping,
+        emitStopTyping,
+        getTypistsFor,
 
         // Optimistic dispatchers
         optimisticRenameList,

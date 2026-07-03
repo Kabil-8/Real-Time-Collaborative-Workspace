@@ -170,6 +170,76 @@ const handleConnection = (io, socket) => {
     }
   });
 
+  // ─── typing:start / typing:stop ─────────────────────────────────────────────
+  /**
+   * Relay typing presence events to all other sockets in the board room.
+   *
+   * Client emits:
+   *   socket.emit("typing:start", { boardId, context, listId?, cardId? })
+   *   socket.emit("typing:stop",  { boardId, context, listId?, cardId? })
+   *
+   * Server relays to room (excluding sender):
+   *   "typing:start" → { boardId, context, listId?, cardId?, user: { _id, name, avatarColor } }
+   *   "typing:stop"  → { boardId, context, listId?, cardId?, userId }
+   *
+   * context values:
+   *   "list_add_card" — user typing in the "Add a card" form of a list
+   *   "list_rename"   — user typing in the rename input of a list
+   *   "card_title"    — user typing in the card title field
+   *   "card_desc"     — user typing in the card description field
+   */
+  const VALID_TYPING_CONTEXTS = new Set([
+    "list_add_card",
+    "list_rename",
+    "card_title",
+    "card_desc",
+  ]);
+
+  socket.on("typing:start", (payload) => {
+    try {
+      const { boardId, context, listId, cardId } = payload || {};
+      if (!isValidId(boardId) || !VALID_TYPING_CONTEXTS.has(context)) return;
+
+      const roomKey = `board:${boardId}`;
+      // Only relay if the socket is actually in this room
+      if (!presenceManager.getRoomUserIds(roomKey).includes(user._id)) return;
+
+      socket.to(roomKey).emit("typing:start", {
+        boardId,
+        context,
+        listId:  listId  || null,
+        cardId:  cardId  || null,
+        user: {
+          _id:         user._id,
+          name:        user.name,
+          avatarColor: user.avatarColor || "#7c3aed",
+        },
+      });
+    } catch (err) {
+      console.error(`[Socket] ❌ typing:start error for socket ${socket.id}:`, err.message);
+    }
+  });
+
+  socket.on("typing:stop", (payload) => {
+    try {
+      const { boardId, context, listId, cardId } = payload || {};
+      if (!isValidId(boardId) || !VALID_TYPING_CONTEXTS.has(context)) return;
+
+      const roomKey = `board:${boardId}`;
+      if (!presenceManager.getRoomUserIds(roomKey).includes(user._id)) return;
+
+      socket.to(roomKey).emit("typing:stop", {
+        boardId,
+        context,
+        listId:  listId  || null,
+        cardId:  cardId  || null,
+        userId:  user._id,
+      });
+    } catch (err) {
+      console.error(`[Socket] ❌ typing:stop error for socket ${socket.id}:`, err.message);
+    }
+  });
+
   // ─── ping / pong (keepalive + latency) ──────────────────────────────────────
   /**
    * Client emits:  socket.emit("ping", { timestamp: Date.now() })
