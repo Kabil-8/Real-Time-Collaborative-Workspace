@@ -193,6 +193,7 @@ const handleConnection = (io, socket) => {
     "list_rename",
     "card_title",
     "card_desc",
+    "comment_typing",
   ]);
 
   socket.on("typing:start", (payload) => {

@@ -57,7 +57,11 @@ const SavingIndicator = ({ visible }) => {
 const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const { isDark } = useTheme();
   const { user }   = useAuth();
-  const { optimisticUpdateCard, optimisticArchiveCard, pendingCardIds, emitTyping, emitStopTyping, getTypistsFor } = useBoardContext();
+  const {
+    optimisticUpdateCard, optimisticArchiveCard, pendingCardIds,
+    emitTyping, emitStopTyping, getTypistsFor,
+    registerCommentListener,
+  } = useBoardContext();
 
   const [card, setCard]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,9 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const [commentText,    setCommentText]    = useState("");
   const [addingComment,  setAddingComment]  = useState(false);
   const [editingComment, setEditingComment] = useState(null);
+  // Inline confirmation states (replacing window.confirm)
+  const [confirmArchive,      setConfirmArchive]      = useState(false);
+  const [confirmDeleteComment, setConfirmDeleteComment] = useState(null); // commentId
 
   const [newCLTitle,  setNewCLTitle]  = useState("");
   const [addingCL,    setAddingCL]    = useState(false);
@@ -107,6 +114,39 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
     const c = await cardsApi.fetchCard(cardId);
     setCard(c); onCardUpdated?.(c);
   }, [cardId, onCardUpdated]);
+
+  // ── Subscribe to real-time comment events for THIS card ───────────────
+  useEffect(() => {
+    if (!registerCommentListener) return;
+    const unsub = registerCommentListener(({ event, cardId: eid, comment, commentId, originSocketId }) => {
+      if (eid !== cardId) return; // not our card
+      setCard(prev => {
+        if (!prev) return prev;
+        if (event === "added") {
+          // Deduplicate
+          const exists = prev.comments.some(c => c._id === comment._id);
+          if (exists) return prev;
+          return { ...prev, comments: [...prev.comments, comment] };
+        }
+        if (event === "edited") {
+          return {
+            ...prev,
+            comments: prev.comments.map(c =>
+              c._id === comment._id ? { ...c, ...comment } : c
+            ),
+          };
+        }
+        if (event === "deleted") {
+          return {
+            ...prev,
+            comments: prev.comments.filter(c => c._id !== commentId),
+          };
+        }
+        return prev;
+      });
+    });
+    return unsub;
+  }, [cardId, registerCommentListener]);
 
   const handleOverlay = (e) => { if (e.target === overlayRef.current) onClose(); };
 
@@ -178,16 +218,32 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
   const submitComment = async () => {
     if (!commentText.trim()) return;
     setAddingComment(true);
-    try { await cardsApi.addComment(cardId, commentText); setCommentText(""); await refresh(); }
-    finally { setAddingComment(false); }
+    // Stop typing indicator immediately on post
+    emitStopTyping("comment_typing", null, cardId);
+    try {
+      const newComment = await cardsApi.addComment(cardId, commentText);
+      setCommentText("");
+      // Optimistically append (socket event will handle other clients)
+      setCard(prev => prev ? { ...prev, comments: [...(prev.comments || []), newComment] } : prev);
+    } finally { setAddingComment(false); }
   };
   const saveEditComment = async (id, text) => {
-    await cardsApi.editComment(cardId, id, text);
-    setEditingComment(null); await refresh();
+    const updated = await cardsApi.editComment(cardId, id, text);
+    setEditingComment(null);
+    // Optimistic update locally (socket handles others)
+    setCard(prev => prev ? {
+      ...prev,
+      comments: prev.comments.map(c => c._id === id ? { ...c, ...updated } : c),
+    } : prev);
   };
   const delComment = async (id) => {
-    if (!window.confirm("Delete this comment?")) return;
-    await cardsApi.deleteComment(cardId, id); await refresh();
+    await cardsApi.deleteComment(cardId, id);
+    setConfirmDeleteComment(null);
+    // Optimistic removal locally
+    setCard(prev => prev ? {
+      ...prev,
+      comments: prev.comments.filter(c => c._id !== id),
+    } : prev);
   };
 
   /* ── Checklists (optimistic toggle) ── */
@@ -230,7 +286,6 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
 
   /* ── Archive ── */
   const archive = () => {
-    if (!window.confirm(`Archive "${card.title}"?`)) return;
     optimisticArchiveCard(cardId, () => cardsApi.archiveCard(cardId));
     onCardUpdated?.({ ...card, isArchived: true });
     onClose();
@@ -304,13 +359,13 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
               <button onClick={openMove} title="Move card" className="p-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: sub }}><Move size={14} /></button>
               <button onClick={() => setShowCover(v => !v)} title="Cover color" className="p-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: sub }}><Palette size={14} /></button>
               <button onClick={duplicate} title="Duplicate" className="p-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: sub }}><Copy size={14} /></button>
-              <button onClick={archive} title="Archive" className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
+              <button onClick={() => setConfirmArchive(v => !v)} title="Archive" className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"><Trash2 size={14} /></button>
             </>)}
             <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/10" style={{ color: sub }}><X size={16} /></button>
           </div>
         </div>
 
-        {/* Remote typing indicator strip */}
+        {/* Remote typing indicator strip — title + desc */}
         {(() => {
           const remoteTypists = [
             ...getTypistsFor("card_title", null, cardId),
@@ -322,6 +377,25 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
             </div>
           ) : null;
         })()}
+
+        {/* Inline archive confirm banner */}
+        {confirmArchive && (
+          <div className="mx-5 mb-2 px-4 py-3 rounded-xl flex items-center justify-between gap-3"
+            style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)" }}>
+            <span className="text-sm text-red-400 font-medium">Archive “{card?.title}”?</span>
+            <div className="flex gap-2">
+              <button onClick={archive}
+                className="px-3 py-1 rounded-lg bg-red-500 hover:bg-red-400 text-white text-xs font-semibold transition-all">
+                Archive
+              </button>
+              <button onClick={() => setConfirmArchive(false)}
+                className="px-3 py-1 rounded-lg text-xs transition-all"
+                style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-violet-400" /></div>
@@ -488,8 +562,21 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
                   {user?.name?.[0]?.toUpperCase() || "U"}
                 </div>
                 <div className="flex-1 space-y-2">
-                  <textarea value={commentText} onChange={e => setCommentText(e.target.value)}
-                    placeholder="Write a comment…" rows={2} className={`${iCls} resize-none`} style={iStyle} />
+                  {/* Comment typing indicator — shown when remote users type here */}
+                  {getTypistsFor("comment_typing", null, cardId).length > 0 && (
+                    <TypingBadge typists={getTypistsFor("comment_typing", null, cardId)} />
+                  )}
+                  <textarea value={commentText}
+                    onChange={e => {
+                      setCommentText(e.target.value);
+                      emitTyping("comment_typing", null, cardId);
+                    }}
+                    onBlur={() => emitStopTyping("comment_typing", null, cardId)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submitComment();
+                    }}
+                    placeholder="Write a comment… (Ctrl+Enter to post)" rows={2}
+                    className={`${iCls} resize-none`} style={iStyle} />
                   {commentText.trim() && (
                     <button onClick={submitComment} disabled={addingComment}
                       className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold disabled:opacity-50">
@@ -527,7 +614,17 @@ const CardDetailModal = ({ cardId, onClose, onCardUpdated, boardId }) => {
                       {c.author?._id === user?._id && !editingComment && (
                         <div className="flex gap-2 mt-1">
                           <button onClick={() => setEditingComment({ id: c._id, text: c.text })} className="text-[11px]" style={{ color: sub }}>Edit</button>
-                          <button onClick={() => delComment(c._id)} className="text-[11px] text-red-400">Delete</button>
+                          <button onClick={() => setConfirmDeleteComment(c._id)} className="text-[11px] text-red-400">Delete</button>
+                        </div>
+                      )}
+                      {/* Inline delete confirm */}
+                      {confirmDeleteComment === c._id && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[11px]" style={{ color: sub }}>Delete this comment?</span>
+                          <button onClick={() => delComment(c._id)}
+                            className="text-[11px] text-red-400 font-semibold hover:underline">Yes</button>
+                          <button onClick={() => setConfirmDeleteComment(null)}
+                            className="text-[11px]" style={{ color: sub }}>Cancel</button>
                         </div>
                       )}
                     </div>

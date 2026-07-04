@@ -10,6 +10,9 @@ const {
   emitCardArchived,
   emitCardRestored,
   emitCardDuplicated,
+  emitCommentAdded,
+  emitCommentEdited,
+  emitCommentDeleted,
 } = require("../socket/emitters/cardEmitter");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -398,7 +401,13 @@ exports.addComment = async (req, res, next) => {
     await card.populate("comments.author", "name avatar avatarColor");
 
     const comment = card.comments[card.comments.length - 1];
-    return successResponse(res, { comment }, "Comment added.", 201);
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { comment }, "Comment added.", 201);
+
+    // ── Broadcast new comment to board room ───────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCommentAdded(req.app, card.board.toString(), card._id.toString(), comment, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -430,7 +439,13 @@ exports.editComment = async (req, res, next) => {
     await card.populate("comments.author", "name avatar avatarColor");
 
     const updated = card.comments.id(req.params.commentId);
-    return successResponse(res, { comment: updated }, "Comment updated.");
+
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, { comment: updated }, "Comment updated.");
+
+    // ── Broadcast edited comment to board room ────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCommentEdited(req.app, card.board.toString(), card._id.toString(), updated, originSocketId);
   } catch (err) {
     next(err);
   }
@@ -459,10 +474,16 @@ exports.deleteComment = async (req, res, next) => {
       return errorResponse(res, "You cannot delete this comment.", 403);
     }
 
+    const commentId = req.params.commentId;
     comment.deleteOne();
     await card.save();
 
-    return successResponse(res, {}, "Comment deleted.");
+    // ── HTTP response first ───────────────────────────────────────────────────
+    successResponse(res, {}, "Comment deleted.");
+
+    // ── Broadcast deletion to board room ──────────────────────────────────────
+    const originSocketId = req.headers["x-socket-id"] || null;
+    emitCommentDeleted(req.app, card.board.toString(), card._id.toString(), commentId, originSocketId);
   } catch (err) {
     next(err);
   }

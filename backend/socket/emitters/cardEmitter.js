@@ -263,6 +263,115 @@ const emitCardDuplicated = (app, boardId, card, originSocketId) => {
   }
 };
 
+// ─── comment:added ────────────────────────────────────────────────────────────
+
+/**
+ * Broadcast a new comment to all sockets in the board room.
+ *
+ * Payload:
+ * { boardId, cardId, comment: { _id, text, author, createdAt, isEdited },
+ *   originSocketId }
+ *
+ * @param {import("express").Application} app
+ * @param {string} boardId
+ * @param {string} cardId
+ * @param {object} comment  - populated comment subdocument
+ * @param {string} [originSocketId]
+ */
+const emitCommentAdded = (app, boardId, cardId, comment, originSocketId) => {
+  try {
+    const io = getIO(app);
+    if (!io) return;
+
+    const roomKey = getBoardRoom(boardId);
+
+    io.to(roomKey).emit("comment:added", {
+      boardId,
+      cardId,
+      comment,
+      originSocketId: originSocketId || null,
+    });
+
+    console.log(
+      `[CardEmitter] 📤 comment:added → ${roomKey} | card=${cardId} | comment=${comment._id}`
+    );
+  } catch (err) {
+    console.error("[CardEmitter] ❌ Failed to emit comment:added:", err.message);
+  }
+};
+
+// ─── comment:edited ───────────────────────────────────────────────────────────
+
+/**
+ * Broadcast a comment edit to all sockets in the board room.
+ *
+ * Payload:
+ * { boardId, cardId, comment: { _id, text, isEdited, editedAt }, originSocketId }
+ *
+ * @param {import("express").Application} app
+ * @param {string} boardId
+ * @param {string} cardId
+ * @param {object} comment  - updated comment subdocument
+ * @param {string} [originSocketId]
+ */
+const emitCommentEdited = (app, boardId, cardId, comment, originSocketId) => {
+  try {
+    const io = getIO(app);
+    if (!io) return;
+
+    const roomKey = getBoardRoom(boardId);
+
+    io.to(roomKey).emit("comment:edited", {
+      boardId,
+      cardId,
+      comment,
+      originSocketId: originSocketId || null,
+    });
+
+    console.log(
+      `[CardEmitter] 📤 comment:edited → ${roomKey} | card=${cardId} | comment=${comment._id}`
+    );
+  } catch (err) {
+    console.error("[CardEmitter] ❌ Failed to emit comment:edited:", err.message);
+  }
+};
+
+// ─── comment:deleted ──────────────────────────────────────────────────────────
+
+/**
+ * Broadcast a comment deletion to all sockets in the board room.
+ *
+ * Payload:
+ * { boardId, cardId, commentId, originSocketId }
+ *
+ * @param {import("express").Application} app
+ * @param {string} boardId
+ * @param {string} cardId
+ * @param {string} commentId
+ * @param {string} [originSocketId]
+ */
+const emitCommentDeleted = (app, boardId, cardId, commentId, originSocketId) => {
+  try {
+    const io = getIO(app);
+    if (!io) return;
+
+    const roomKey = getBoardRoom(boardId);
+
+    io.to(roomKey).emit("comment:deleted", {
+      boardId,
+      cardId,
+      commentId,
+      originSocketId: originSocketId || null,
+    });
+
+    console.log(
+      `[CardEmitter] 📤 comment:deleted → ${roomKey} | card=${cardId} | comment=${commentId}`
+    );
+  } catch (err) {
+    console.error("[CardEmitter] ❌ Failed to emit comment:deleted:", err.message);
+  }
+};
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -272,4 +381,7 @@ module.exports = {
   emitCardArchived,
   emitCardRestored,
   emitCardDuplicated,
+  emitCommentAdded,
+  emitCommentEdited,
+  emitCommentDeleted,
 };

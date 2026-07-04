@@ -3,11 +3,12 @@
  * ─────────────────────────────────────────────────────────────────
  * Central state for a single Kanban board.
  *
- * Real-time events handled (Day 3-5 complete):
+ * Real-time events handled (Day 3-7 complete):
  *   card:created    card:updated    card:moved
  *   card:archived   card:restored   card:duplicated
  *   list:created    list:updated    list:archived
  *   list:restored   list:duplicated list:reordered
+ *   comment:added   comment:edited  comment:deleted
  *
  * Self-deduplication:
  *   Every Axios request carries `x-socket-id` (injected by an
@@ -235,6 +236,57 @@ export const BoardProvider = ({ boardId, children }) => {
     socket.on("card:duplicated", handler);
     return () => socket.off("card:duplicated", handler);
   }, [socket, boardId, isSelf]);
+
+  // ════════════════════════════════════════════════════════════════
+  //  COMMENT SOCKET HANDLERS
+  // ════════════════════════════════════════════════════════════════
+
+  /**
+   * Stores refs to registered comment-event listeners so CardDetailModal
+   * can subscribe its own refresh logic via registerCommentListener().
+   */
+  const commentListenersRef = useRef([]);
+
+  const registerCommentListener = useCallback((fn) => {
+    commentListenersRef.current.push(fn);
+    return () => {
+      commentListenersRef.current = commentListenersRef.current.filter((f) => f !== fn);
+    };
+  }, []);
+
+  // ── comment:added ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, cardId, comment, originSocketId }) => {
+      if (eid !== boardId) return;
+      // Notify all registered comment listeners (e.g., open CardDetailModal)
+      commentListenersRef.current.forEach((fn) => fn({ event: "added", cardId, comment, originSocketId }));
+    };
+    socket.on("comment:added", handler);
+    return () => socket.off("comment:added", handler);
+  }, [socket, boardId]);
+
+  // ── comment:edited ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, cardId, comment, originSocketId }) => {
+      if (eid !== boardId) return;
+      commentListenersRef.current.forEach((fn) => fn({ event: "edited", cardId, comment, originSocketId }));
+    };
+    socket.on("comment:edited", handler);
+    return () => socket.off("comment:edited", handler);
+  }, [socket, boardId]);
+
+  // ── comment:deleted ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ boardId: eid, cardId, commentId, originSocketId }) => {
+      if (eid !== boardId) return;
+      commentListenersRef.current.forEach((fn) => fn({ event: "deleted", cardId, commentId, originSocketId }));
+    };
+    socket.on("comment:deleted", handler);
+    return () => socket.off("comment:deleted", handler);
+  }, [socket, boardId]);
 
   // ════════════════════════════════════════════════════════════════
   //  LIST SOCKET HANDLERS
@@ -616,6 +668,9 @@ export const BoardProvider = ({ boardId, children }) => {
         emitTyping,
         emitStopTyping,
         getTypistsFor,
+
+        // Real-time comment subscriptions (Day 6-7)
+        registerCommentListener,
 
         // Optimistic dispatchers
         optimisticRenameList,
