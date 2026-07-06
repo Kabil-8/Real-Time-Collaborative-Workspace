@@ -14,6 +14,7 @@ const {
   emitCommentEdited,
   emitCommentDeleted,
 } = require("../socket/emitters/cardEmitter");
+const notifyUser = require("../utils/notifyUser");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -226,6 +227,29 @@ exports.updateCard = async (req, res, next) => {
     // ── Broadcast to all board room members ───────────────────────────────────
     const originSocketId = req.headers["x-socket-id"] || null;
     emitCardUpdated(req.app, updated.board.toString(), updated, originSocketId);
+
+    // ── Notify newly-added assignees ──────────────────────────────────────────
+    if (Array.isArray(req.body.assignees)) {
+      const prevAssignees = (card.assignees || []).map((a) => a.toString());
+      const newAssignees  = req.body.assignees.filter(
+        (id) => !prevAssignees.includes(id.toString())
+      );
+      const io = req.app.get("io");
+      await Promise.all(
+        newAssignees.map((recipientId) => {
+          if (recipientId.toString() === req.user._id.toString()) return; // skip self
+          return notifyUser(io, {
+            recipient : recipientId,
+            actor     : req.user._id,
+            type      : "card_assigned",
+            message   : `${req.user.name} assigned you to "${updated.title}"`,
+            board     : updated.board,
+            card      : updated._id,
+            link      : `/boards/${updated.board}`,
+          });
+        })
+      );
+    }
   } catch (err) {
     next(err);
   }
@@ -408,6 +432,28 @@ exports.addComment = async (req, res, next) => {
     // ── Broadcast new comment to board room ───────────────────────────────────
     const originSocketId = req.headers["x-socket-id"] || null;
     emitCommentAdded(req.app, card.board.toString(), card._id.toString(), comment, originSocketId);
+
+    // ── Notify card assignees (excluding the commenter) ───────────────────────
+    const io = req.app.get("io");
+    const recipients = [
+      ...(card.assignees || []),
+      card.createdBy,
+    ].filter((id) => id && id.toString() !== req.user._id.toString());
+
+    const uniqueRecipients = [...new Set(recipients.map((r) => r.toString()))];
+    await Promise.all(
+      uniqueRecipients.map((recipientId) =>
+        notifyUser(io, {
+          recipient : recipientId,
+          actor     : req.user._id,
+          type      : "card_comment",
+          message   : `${req.user.name} commented on "${card.title}"`,
+          board     : card.board,
+          card      : card._id,
+          link      : `/boards/${card.board}`,
+        })
+      )
+    );
   } catch (err) {
     next(err);
   }

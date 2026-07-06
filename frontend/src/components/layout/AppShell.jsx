@@ -5,8 +5,10 @@ import Sidebar, { Avatar } from "./Sidebar";
 import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal";
 import ThemeToggle from "./ThemeToggle";
 import SearchModal from "../ui/SearchModal";
+import NotificationPanel from "../ui/NotificationPanel";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
+import { useNotifications } from "../../context/NotificationContext";
 
 // ─── Breadcrumb ───────────────────────────────────────────────────────────────
 const Breadcrumb = () => {
@@ -21,6 +23,9 @@ const Breadcrumb = () => {
   } else if (location.pathname === "/search") {
     segments.push({ label: "Home", path: "/" });
     segments.push({ label: "Search", path: null });
+  } else if (location.pathname === "/notifications") {
+    segments.push({ label: "Home", path: "/" });
+    segments.push({ label: "Notifications", path: null });
   } else if (location.pathname.includes("/boards/")) {
     segments.push({ label: "Boards", path: "/boards" });
     segments.push({ label: "Board", path: null });
@@ -58,7 +63,9 @@ const AppShell = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
 
   // ⌘K / Ctrl+K opens search
   const openSearch = useCallback(() => setShowSearch(true), []);
@@ -113,15 +120,26 @@ const AppShell = ({ children }) => {
             </button>
 
             {/* Notification bell */}
-            <button className="relative p-2 rounded-xl text-slate-500 hover:text-slate-300
-              hover:bg-slate-800/60 dark:hover:bg-slate-800/60 transition-all">
-              <Bell size={16} />
-              {/* Notification dot */}
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-violet-500
-                border-2 border-slate-950 dark:border-slate-950">
-                <span className="absolute inset-0 rounded-full bg-violet-400 animate-ping opacity-75" />
-              </span>
-            </button>
+            <div className="relative">
+              <button
+                id="notification-bell"
+                onClick={() => setShowNotifications((v) => !v)}
+                className={`relative p-2 rounded-xl transition-all
+                  ${showNotifications
+                    ? "text-violet-300 bg-violet-500/15"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/60"}`}
+              >
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5
+                    rounded-full bg-violet-500 border border-slate-950
+                    text-[9px] font-bold text-white flex items-center justify-center">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                    <span className="absolute inset-0 rounded-full bg-violet-400 animate-ping opacity-50" />
+                  </span>
+                )}
+              </button>
+            </div>
 
             {/* Theme toggle */}
             <ThemeToggle />
@@ -144,6 +162,10 @@ const AppShell = ({ children }) => {
       )}
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+
+      {showNotifications && (
+        <NotificationPanel onClose={() => setShowNotifications(false)} />
+      )}
     </div>
   );
 };

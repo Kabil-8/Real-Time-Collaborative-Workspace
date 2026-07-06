@@ -1,3 +1,14 @@
+/**
+ * components/ui/SearchModal.jsx  (enhanced)
+ *
+ * Global quick-search modal with:
+ *   • Debounced search (280 ms)
+ *   • Full keyboard navigation: ↑↓ arrows, Enter to open, Esc to close
+ *   • Priority filter pills
+ *   • Recent searches (localStorage)
+ *   • "View all results" footer link → /search?q=...
+ */
+
 import React, {
   useCallback,
   useEffect,
@@ -9,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Search, X, Trello, LayoutList, Clock, Hash,
   AlertCircle, Calendar, ArrowRight, Loader, Star,
+  ExternalLink,
 } from "lucide-react";
 import api from "../../utils/api";
 import { useWorkspace } from "../../context/WorkspaceContext";
@@ -21,6 +33,8 @@ const PRIORITY_META = {
   low:      { label: "Low",      color: "#22c55e" },
   none:     { label: "None",     color: "#6b7280" },
 };
+
+const PRIORITY_ORDER = ["critical", "high", "medium", "low"];
 
 const highlight = (text = "", query = "") => {
   if (!query.trim()) return text;
@@ -39,7 +53,7 @@ const formatDate = (date) => {
   const now = new Date();
   const diff = (d - now) / (1000 * 60 * 60 * 24);
   if (diff < -1) return { label: `Overdue · ${d.toLocaleDateString()}`, color: "#ef4444" };
-  if (diff < 0)  return { label: "Due today", color: "#f97316" };
+  if (diff < 0)  return { label: "Due today",    color: "#f97316" };
   if (diff < 1)  return { label: "Due tomorrow", color: "#eab308" };
   return { label: d.toLocaleDateString(), color: "#6b7280" };
 };
@@ -48,6 +62,7 @@ const formatDate = (date) => {
 const BoardResult = ({ board, query, isActive, onClick }) => (
   <button
     onClick={onClick}
+    data-active={isActive || undefined}
     className={`search-result-row group ${isActive ? "search-result-active" : ""}`}
   >
     <div
@@ -78,6 +93,7 @@ const CardResult = ({ card, query, isActive, onClick }) => {
   return (
     <button
       onClick={onClick}
+      data-active={isActive || undefined}
       className={`search-result-row group ${isActive ? "search-result-active" : ""}`}
     >
       <div className="search-result-icon" style={{ background: card.coverColor || "rgba(124,58,237,0.2)" }}>
@@ -113,6 +129,39 @@ const CardResult = ({ card, query, isActive, onClick }) => {
   );
 };
 
+// ─── Filter pills ────────────────────────────────────────────────────────────
+const PriorityPills = ({ active, onChange }) => (
+  <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-800/60 flex-wrap">
+    <span className="text-[10px] text-slate-600 font-semibold uppercase tracking-widest mr-1">Priority:</span>
+    {PRIORITY_ORDER.map((p) => {
+      const meta   = PRIORITY_META[p];
+      const isOn   = active === p;
+      return (
+        <button
+          key={p}
+          onClick={() => onChange(isOn ? null : p)}
+          className="px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all"
+          style={{
+            color:       isOn ? "#fff"       : meta.color,
+            borderColor: `${meta.color}40`,
+            background:  isOn ? meta.color   : `${meta.color}15`,
+          }}
+        >
+          {meta.label}
+        </button>
+      );
+    })}
+    {active && (
+      <button
+        onClick={() => onChange(null)}
+        className="text-[10px] text-slate-600 hover:text-slate-300 transition-colors ml-1 flex items-center gap-0.5"
+      >
+        <X size={9} /> Clear
+      </button>
+    )}
+  </div>
+);
+
 // ─── Empty / idle states ────────────────────────────────────────────────────
 const EmptyState = ({ query }) => (
   <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
@@ -121,7 +170,7 @@ const EmptyState = ({ query }) => (
     </div>
     <div>
       <p className="text-slate-300 font-semibold text-sm">No results for "{query}"</p>
-      <p className="text-slate-600 text-xs mt-1">Try different keywords or check your spelling</p>
+      <p className="text-slate-600 text-xs mt-1">Try different keywords or adjust priority filters</p>
     </div>
   </div>
 );
@@ -146,9 +195,10 @@ const SearchModal = ({ onClose }) => {
   const { activeWorkspace } = useWorkspace();
 
   const [query, setQuery]           = useState("");
-  const [results, setResults]       = useState(null); // null = idle
+  const [results, setResults]       = useState(null);
   const [loading, setLoading]       = useState(false);
   const [activeIdx, setActiveIdx]   = useState(0);
+  const [priorityFilter, setPriority] = useState(null); // null | "critical"|"high"|"medium"|"low"
   const [recentSearches, setRecent] = useState(() => {
     try { return JSON.parse(localStorage.getItem("zaalima_recent_searches") || "[]"); }
     catch { return []; }
@@ -163,9 +213,7 @@ const SearchModal = ({ onClose }) => {
 
   // Keyboard shortcut to close
   useEffect(() => {
-    const handler = (e) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -183,12 +231,13 @@ const SearchModal = ({ onClose }) => {
 
   // ── Search API call ─────────────────────────────────────────────────────
   const doSearch = useCallback(
-    async (q) => {
+    async (q, prio = priorityFilter) => {
       if (!q.trim()) { setResults(null); setLoading(false); return; }
       setLoading(true);
       try {
-        const params = { q };
+        const params = { q, limit: 8 };
         if (activeWorkspace?._id) params.workspaceId = activeWorkspace._id;
+        if (prio) params.priority = prio;
         const { data } = await api.get("/search", { params });
         setResults({ boards: data.boards || [], cards: data.cards || [] });
       } catch {
@@ -197,7 +246,7 @@ const SearchModal = ({ onClose }) => {
         setLoading(false);
       }
     },
-    [activeWorkspace]
+    [activeWorkspace, priorityFilter]
   );
 
   const handleQueryChange = (e) => {
@@ -206,6 +255,11 @@ const SearchModal = ({ onClose }) => {
     clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => doSearch(val), 280);
   };
+
+  // Re-run search when priority filter changes
+  useEffect(() => {
+    if (query.trim()) doSearch(query, priorityFilter);
+  }, [priorityFilter]);
 
   // ── Keyboard navigation ─────────────────────────────────────────────────
   const handleKeyDown = (e) => {
@@ -226,7 +280,7 @@ const SearchModal = ({ onClose }) => {
 
   // Keep active item visible
   useEffect(() => {
-    const el = listRef.current?.querySelector(".search-result-active");
+    const el = listRef.current?.querySelector("[data-active]");
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
 
@@ -242,8 +296,17 @@ const SearchModal = ({ onClose }) => {
     if (item.type === "board") {
       navigate(`/boards/${item.data._id}`);
     } else {
-      // Navigate to the board; card modal handling can be added later
       navigate(`/boards/${item.data.board?._id || item.data.board}`);
+    }
+    onClose();
+  };
+
+  const viewAllResults = () => {
+    if (query.trim()) {
+      saveRecent(query);
+      navigate(`/search?q=${encodeURIComponent(query)}${priorityFilter ? `&priority=${priorityFilter}` : ""}`);
+    } else {
+      navigate("/search");
     }
     onClose();
   };
@@ -253,16 +316,14 @@ const SearchModal = ({ onClose }) => {
   const isEmpty         = results && !hasBoardResults && !hasCardResults;
   const hasResults      = hasBoardResults || hasCardResults;
 
-  let boardOffset = 0;
-  let cardOffset  = results?.boards?.length || 0;
+  const boardOffset = 0;
+  const cardOffset  = results?.boards?.length || 0;
+  const totalCount  = (results?.boards?.length || 0) + (results?.cards?.length || 0);
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="search-backdrop"
-        onClick={onClose}
-      />
+      <div className="search-backdrop" onClick={onClose} />
 
       {/* Modal */}
       <div className="search-modal animate-search-in" role="dialog" aria-label="Search">
@@ -293,6 +354,9 @@ const SearchModal = ({ onClose }) => {
           )}
           <kbd className="kbd-hint ml-1">Esc</kbd>
         </div>
+
+        {/* Priority filter pills */}
+        <PriorityPills active={priorityFilter} onChange={setPriority} />
 
         {/* Results body */}
         <div ref={listRef} className="search-results-body">
@@ -385,15 +449,33 @@ const SearchModal = ({ onClose }) => {
         </div>
 
         {/* Footer */}
-        {hasResults && (
-          <div className="search-footer">
-            <span>{(results.boards?.length || 0) + (results.cards?.length || 0)} results</span>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1"><kbd className="kbd-hint">↑↓</kbd> navigate</span>
-              <span className="flex items-center gap-1"><kbd className="kbd-hint">↵</kbd> open</span>
-            </div>
+        <div className="search-footer">
+          <span>
+            {hasResults
+              ? `${totalCount} result${totalCount !== 1 ? "s" : ""}`
+              : query && !loading
+              ? "No results"
+              : "Type to search"}
+          </span>
+          <div className="flex items-center gap-3">
+            {hasResults && (
+              <button
+                onClick={viewAllResults}
+                className="flex items-center gap-1.5 text-[11px] text-violet-400
+                  hover:text-violet-300 transition-colors"
+              >
+                <ExternalLink size={10} />
+                View all results
+              </button>
+            )}
+            {hasResults && (
+              <>
+                <span className="flex items-center gap-1"><kbd className="kbd-hint">↑↓</kbd> navigate</span>
+                <span className="flex items-center gap-1"><kbd className="kbd-hint">↵</kbd> open</span>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </>
   );

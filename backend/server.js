@@ -14,7 +14,8 @@ const workspaceRoutes = require("./routes/workspaces");
 const boardRoutes = require("./routes/boards");
 const listRoutes = require("./routes/lists");
 const cardRoutes = require("./routes/cards");
-const searchRoutes = require("./routes/search");
+const searchRoutes       = require("./routes/search");
+const notificationRoutes = require("./routes/notifications");
 
 // ─── App & HTTP server setup ──────────────────────────────────────────────────
 const app = express();
@@ -60,7 +61,8 @@ app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/boards", boardRoutes);
 app.use("/api/lists", listRoutes);
 app.use("/api/cards", cardRoutes);
-app.use("/api/search", searchRoutes);
+app.use("/api/search",        searchRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ─── Health check (includes live socket stats) ────────────────────────────────
 app.get("/api/health", (req, res) => {

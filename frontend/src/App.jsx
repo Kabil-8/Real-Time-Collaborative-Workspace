@@ -13,6 +13,8 @@ import MembersPage from "./pages/MembersPage";
 import BoardPage from "./pages/BoardPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import SearchPage from "./pages/SearchPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import { NotificationProvider } from "./context/NotificationContext";
 
 // ─── Branded loading screen ───────────────────────────────────────────────────
 const LoadingScreen = () => (
@@ -67,7 +69,9 @@ const AppRoutes = () => (
     <Route path="/" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><HomePage /></AppShell>
+          <NotificationProvider>
+            <AppShell><HomePage /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -75,7 +79,9 @@ const AppRoutes = () => (
     <Route path="/boards" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><HomePage /></AppShell>
+          <NotificationProvider>
+            <AppShell><HomePage /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -83,7 +89,19 @@ const AppRoutes = () => (
     <Route path="/search" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><SearchPage /></AppShell>
+          <NotificationProvider>
+            <AppShell><SearchPage /></AppShell>
+          </NotificationProvider>
+        </WorkspaceProvider>
+      </PrivateRoute>
+    } />
+
+    <Route path="/notifications" element={
+      <PrivateRoute>
+        <WorkspaceProvider>
+          <NotificationProvider>
+            <AppShell><NotificationsPage /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -91,7 +109,9 @@ const AppRoutes = () => (
     <Route path="/boards/:boardId" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><BoardPage /></AppShell>
+          <NotificationProvider>
+            <AppShell><BoardPage /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -99,7 +119,9 @@ const AppRoutes = () => (
     <Route path="/workspace/:workspaceId/settings" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><WorkspaceSettings /></AppShell>
+          <NotificationProvider>
+            <AppShell><WorkspaceSettings /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />
@@ -107,7 +129,9 @@ const AppRoutes = () => (
     <Route path="/workspace/:workspaceId/members" element={
       <PrivateRoute>
         <WorkspaceProvider>
-          <AppShell><MembersPage /></AppShell>
+          <NotificationProvider>
+            <AppShell><MembersPage /></AppShell>
+          </NotificationProvider>
         </WorkspaceProvider>
       </PrivateRoute>
     } />

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
+import { useNotifications } from "../../context/NotificationContext";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 export const Avatar = ({ user, size = "sm", online = false }) => {
@@ -193,6 +194,7 @@ const WorkspaceSwitcher = ({ onCreateClick }) => {
 const Sidebar = ({ onCreateWorkspace, collapsed, onToggleCollapse }) => {
   const { user, logout } = useAuth();
   const { activeWorkspace } = useWorkspace();
+  const { unreadCount } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -266,8 +268,8 @@ const Sidebar = ({ onCreateWorkspace, collapsed, onToggleCollapse }) => {
         <SectionLabel>General</SectionLabel>
         <NavItem icon={LayoutDashboard} label="Home" to="/" active={location.pathname === "/"} />
         <NavItem icon={Search}          label="Search"  to="/search" active={isActive("/search")} />
-        <NavItem icon={Bell}            label="Notifications" to="/notifications"
-          active={isActive("/notifications")} badge={3} />
+        <NavItem icon={Bell} label="Notifications" to="/notifications"
+          active={isActive("/notifications")} badge={unreadCount || null} />
 
         {activeWorkspace && (
           <>

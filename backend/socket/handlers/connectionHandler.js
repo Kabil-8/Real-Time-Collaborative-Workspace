@@ -45,6 +45,11 @@ const handleConnection = (io, socket) => {
   // Register in presence map
   presenceManager.addSocket(socket.id, user);
 
+  // ── Personal room: enables targeted notification delivery ──────────────────
+  // Other server code emits to `user:<userId>` to reach this socket directly,
+  // regardless of which board room(s) the user has joined.
+  socket.join(`user:${user._id}`);
+
   console.log(
     `[Socket] ✅ Connected  | id=${socket.id} | user=${user.name} (${user._id})`
   );

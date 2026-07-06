@@ -146,6 +146,9 @@ cardSchema.index({ board: 1 });
 cardSchema.index({ assignees: 1 });
 cardSchema.index({ dueDate: 1 });
 
+// Full-text search index
+cardSchema.index({ title: "text", description: "text" }, { weights: { title: 10, description: 3 } });
+
 // Virtual: completion percentage of all checklists
 cardSchema.virtual("checklistProgress").get(function () {
   const allItems = this.checklists.flatMap((cl) => cl.items);
