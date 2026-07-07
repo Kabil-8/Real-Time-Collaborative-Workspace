@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -46,6 +47,22 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Cached system role — source of truth is the Role model.
+    // Updated whenever Role.promoteToAdmin / Role.revoke is called.
+    systemRole: {
+      type: String,
+      enum: ["user", "moderator", "admin", "superadmin"],
+      default: "user",
+      index: true,
+    },
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -70,9 +87,19 @@ userSchema.methods.toPublicJSON = function () {
     email: this.email,
     avatar: this.avatar,
     avatarColor: this.avatarColor,
+    systemRole: this.systemRole,
     lastActive: this.lastActive,
     createdAt: this.createdAt,
   };
+};
+
+/** Convenience helpers that check the cached systemRole field */
+userSchema.methods.isAdmin = function () {
+  return ["admin", "superadmin"].includes(this.systemRole);
+};
+
+userSchema.methods.isSuperAdmin = function () {
+  return this.systemRole === "superadmin";
 };
 
 module.exports = mongoose.model("User", userSchema);

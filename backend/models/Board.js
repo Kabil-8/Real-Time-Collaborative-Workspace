@@ -98,4 +98,8 @@ boardSchema.pre("save", function (next) {
   next();
 });
 
+// Indexes
+boardSchema.index({ workspace: 1, isArchived: 1 });
+boardSchema.index({ title: "text", description: "text" }, { weights: { title: 10, description: 5 } });
+
 module.exports = mongoose.model("Board", boardSchema);

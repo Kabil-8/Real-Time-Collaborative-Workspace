@@ -1,17 +1,31 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Settings, Users, Trash2, UserPlus, Copy, Check, Shield } from "lucide-react";
-import { useWorkspace } from "../../context/WorkspaceContext";
-import { useAuth } from "../../context/AuthContext";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { useAuth } from "../context/AuthContext";
 import { Avatar } from "../components/layout/Sidebar";
 
 const ICONS = ["🏢", "🚀", "⚡", "🎯", "🛠️", "🌟", "🔥", "💡", "🎨", "📦"];
 const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
 
 const Section = ({ title, children }) => (
-  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-    <div className="px-6 py-4 border-b border-slate-800">
-      <h3 className="text-base font-semibold text-white">{title}</h3>
+  <div
+    className="rounded-2xl overflow-hidden"
+    style={{
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border-default)",
+      boxShadow: "var(--shadow-sm)",
+    }}
+  >
+    <div
+      className="px-6 py-4"
+      style={{
+        borderBottom: "1px solid var(--border-subtle)",
+      }}
+    >
+      <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+        {title}
+      </h3>
     </div>
     <div className="p-6">{children}</div>
   </div>
@@ -33,7 +47,6 @@ const WorkspaceSettings = () => {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Invite form
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
@@ -43,6 +56,7 @@ const WorkspaceSettings = () => {
   const userRole = activeWorkspace?.getMemberRole?.(user?._id) ||
     activeWorkspace?.members?.find((m) => m.user?._id === user?._id)?.role;
   const canEdit = ["owner", "admin"].includes(userRole);
+  const canInvite = canEdit || (activeWorkspace?.settings?.allowMemberInvites !== false && userRole === "member");
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -84,21 +98,41 @@ const WorkspaceSettings = () => {
 
   if (!activeWorkspace) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-500">
+      <div className="flex items-center justify-center h-full" style={{ color: "var(--text-muted)" }}>
         Select a workspace first.
       </div>
     );
   }
 
+  const inputStyle = {
+    background: "var(--bg-input)",
+    border: "1px solid var(--border-default)",
+    color: "var(--text-primary)",
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    fontSize: "14px",
+    outline: "none",
+    transition: "border-color 0.15s",
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-xl">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+          style={{ background: "var(--bg-surface-3)" }}
+        >
           {activeWorkspace.icon}
         </div>
         <div>
-          <h1 className="text-xl font-bold text-white">{activeWorkspace.name}</h1>
-          <p className="text-sm text-slate-500">Workspace Settings</p>
+          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            {activeWorkspace.name}
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>
+            Workspace Settings
+          </p>
         </div>
       </div>
 
@@ -106,49 +140,67 @@ const WorkspaceSettings = () => {
       <Section title="General">
         <form onSubmit={handleSave} className="space-y-5">
           {saveError && (
-            <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div
+              className="px-4 py-3 rounded-lg text-sm"
+              style={{
+                background: "rgba(220,38,38,0.08)",
+                border: "1px solid rgba(220,38,38,0.25)",
+                color: "var(--text-error)",
+              }}
+            >
               {saveError}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
               Workspace name
             </label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               disabled={!canEdit}
-              className="w-full px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700
-                text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500
-                disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-all"
+              style={inputStyle}
+              onFocus={e => (e.target.style.borderColor = "var(--border-focus)")}
+              onBlur={e => (e.target.style.borderColor = "var(--border-default)")}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Description</label>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+              Description
+            </label>
             <textarea
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               disabled={!canEdit}
               rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700
-                text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500
-                disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-all resize-none"
+              style={{ ...inputStyle, resize: "none" }}
+              onFocus={e => (e.target.style.borderColor = "var(--border-focus)")}
+              onBlur={e => (e.target.style.borderColor = "var(--border-default)")}
             />
           </div>
 
           {/* Icon + Color */}
           <div className="grid grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Icon</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+                Icon
+              </label>
               <div className="flex flex-wrap gap-1.5">
                 {ICONS.map((icon) => (
-                  <button key={icon} type="button"
+                  <button
+                    key={icon}
+                    type="button"
                     onClick={() => canEdit && setForm((f) => ({ ...f, icon }))}
-                    className={`w-9 h-9 rounded-lg text-lg transition-all
-                      ${form.icon === icon ? "bg-violet-500/20 ring-2 ring-violet-500" : "bg-slate-800 hover:bg-slate-700"}
-                      ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className="w-9 h-9 rounded-lg text-lg transition-all"
+                    style={{
+                      background: form.icon === icon ? "rgba(124,58,237,0.15)" : "var(--bg-surface-3)",
+                      outline: form.icon === icon ? "2px solid var(--border-focus)" : "none",
+                      outlineOffset: "1px",
+                      opacity: !canEdit ? 0.5 : 1,
+                      cursor: !canEdit ? "not-allowed" : "pointer",
+                    }}
                   >
                     {icon}
                   </button>
@@ -156,15 +208,23 @@ const WorkspaceSettings = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Color</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+                Color
+              </label>
               <div className="flex flex-wrap gap-2">
                 {COLORS.map((color) => (
-                  <button key={color} type="button"
+                  <button
+                    key={color}
+                    type="button"
                     onClick={() => canEdit && setForm((f) => ({ ...f, color }))}
-                    className={`w-7 h-7 rounded-full transition-all
-                      ${form.color === color ? "ring-2 ring-offset-2 ring-offset-slate-900 ring-white" : ""}
-                      ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                    style={{ backgroundColor: color }}
+                    className="w-7 h-7 rounded-full transition-all"
+                    style={{
+                      backgroundColor: color,
+                      outline: form.color === color ? `3px solid ${color}` : "none",
+                      outlineOffset: "2px",
+                      opacity: !canEdit ? 0.5 : 1,
+                      cursor: !canEdit ? "not-allowed" : "pointer",
+                    }}
                   />
                 ))}
               </div>
@@ -172,9 +232,12 @@ const WorkspaceSettings = () => {
           </div>
 
           {canEdit && (
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500
-                text-white font-semibold text-sm disabled:opacity-50 transition-all">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 transition-all"
+              style={{ background: "var(--brand-primary)" }}
+            >
               {saved ? <><Check size={15} /> Saved</> : saving ? "Saving…" : "Save changes"}
             </button>
           )}
@@ -185,19 +248,31 @@ const WorkspaceSettings = () => {
       <Section title="Members">
         <div className="space-y-3">
           {activeWorkspace.members?.map((member) => (
-            <div key={member.user?._id || member.user}
-              className="flex items-center gap-3 py-2">
+            <div
+              key={member.user?._id || member.user}
+              className="flex items-center gap-3 py-2"
+            >
               <Avatar user={member.user} size="sm" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
                   {member.user?.name || "Unknown"}
                 </p>
-                <p className="text-xs text-slate-500 truncate">{member.user?.email}</p>
+                <p className="text-xs truncate" style={{ color: "var(--text-tertiary)" }}>
+                  {member.user?.email}
+                </p>
               </div>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5
-                ${member.role === "owner" ? "bg-amber-500/15 text-amber-400" :
-                  member.role === "admin" ? "bg-violet-500/15 text-violet-400" :
-                  "bg-slate-700/60 text-slate-400"}`}>
+              <span
+                className="px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5"
+                style={
+                  member.role === "owner"
+                    ? { background: "rgba(245,158,11,0.12)", color: "#d97706" }
+                    : member.role === "admin"
+                    ? { background: "rgba(124,58,237,0.12)", color: "var(--text-brand)" }
+                    : member.role === "viewer"
+                    ? { background: "rgba(59,130,246,0.12)", color: "rgba(59,130,246,1)" }
+                    : { background: "var(--bg-surface-4)", color: "var(--text-secondary)" }
+                }
+              >
                 {member.role === "owner" && <Shield size={11} />}
                 {member.role}
               </span>
@@ -207,7 +282,7 @@ const WorkspaceSettings = () => {
       </Section>
 
       {/* Invite */}
-      {canEdit && (
+      {canInvite && (
         <Section title="Invite members">
           <form onSubmit={handleInvite} className="space-y-4">
             <div className="flex gap-3">
@@ -216,42 +291,69 @@ const WorkspaceSettings = () => {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="colleague@company.com"
-                className="flex-1 px-4 py-3 rounded-xl bg-slate-800/60 border border-slate-700
-                  text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                style={{ ...inputStyle, width: undefined, flex: 1 }}
+                onFocus={e => (e.target.style.borderColor = "var(--border-focus)")}
+                onBlur={e => (e.target.style.borderColor = "var(--border-default)")}
               />
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
-                className="px-3 py-3 rounded-xl bg-slate-800/60 border border-slate-700
-                  text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                style={{
+                  ...inputStyle,
+                  width: undefined,
+                  padding: "12px",
+                }}
+                onFocus={e => (e.target.style.borderColor = "var(--border-focus)")}
+                onBlur={e => (e.target.style.borderColor = "var(--border-default)")}
               >
                 <option value="member">Member</option>
-                <option value="admin">Admin</option>
+                {canEdit && <option value="admin">Admin</option>}
                 <option value="viewer">Viewer</option>
               </select>
             </div>
-            <button type="submit" disabled={inviting || !inviteEmail}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500
-                text-white font-semibold text-sm disabled:opacity-50 transition-all">
+            <button
+              type="submit"
+              disabled={inviting || !inviteEmail}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 transition-all"
+              style={{ background: "var(--brand-primary)" }}
+            >
               <UserPlus size={15} />
               {inviting ? "Sending…" : "Send invite"}
             </button>
           </form>
 
           {inviteResult && (
-            <div className={`mt-4 p-4 rounded-xl border text-sm
-              ${inviteResult.success
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
+            <div
+              className="mt-4 p-4 rounded-xl text-sm"
+              style={
+                inviteResult.success
+                  ? {
+                      background: "rgba(16,185,129,0.08)",
+                      border: "1px solid rgba(16,185,129,0.25)",
+                      color: "var(--text-success)",
+                    }
+                  : {
+                      background: "rgba(220,38,38,0.08)",
+                      border: "1px solid rgba(220,38,38,0.25)",
+                      color: "var(--text-error)",
+                    }
+              }
+            >
               {inviteResult.success ? (
                 <div className="space-y-2">
                   <p className="font-medium">Invite created!</p>
-                  <div className="flex items-center gap-2 bg-slate-800/60 px-3 py-2 rounded-lg">
-                    <code className="flex-1 text-xs text-slate-300 truncate">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                    style={{ background: "var(--bg-surface-3)" }}
+                  >
+                    <code className="flex-1 text-xs truncate" style={{ color: "var(--text-secondary)" }}>
                       {inviteResult.invite?.inviteLink}
                     </code>
-                    <button onClick={copyLink}
-                      className="p-1.5 rounded text-slate-400 hover:text-white transition-colors">
+                    <button
+                      onClick={copyLink}
+                      className="p-1.5 rounded transition-colors"
+                      style={{ color: "var(--text-muted)" }}
+                    >
                       {copiedLink ? <Check size={14} /> : <Copy size={14} />}
                     </button>
                   </div>

@@ -2,6 +2,7 @@ const { verifyToken } = require("../utils/jwt");
 const User = require("../models/User");
 const Workspace = require("../models/Workspace");
 const Board = require("../models/Board");
+const { Role } = require("../models/Role");
 const { errorResponse } = require("../utils/response");
 
 // ─── Protect — require a valid JWT ───────────────────────────────────────────
@@ -100,4 +101,52 @@ const requireBoardAccess = async (req, res, next) => {
   }
 };
 
-module.exports = { protect, requireWorkspaceMember, requireWorkspaceAdmin, requireBoardAccess };
+// ─── requireAdmin — system-level admin check ─────────────────────────────────
+/**
+ * Must be called after `protect`.
+ * Checks the Role document (authoritative) and falls back to User.systemRole cache.
+ * Grants access to admin and superadmin.
+ */
+const requireAdmin = async (req, res, next) => {
+  try {
+    // Fast path — cached field
+    if (!req.user.isAdmin()) {
+      return errorResponse(res, "Admin access required.", 403);
+    }
+    // Authoritative check against Role document
+    const role = await Role.getForUser(req.user._id);
+    if (!role.isValid || !role.isAdmin()) {
+      return errorResponse(res, "Admin access required or role has expired.", 403);
+    }
+    req.systemRole = role;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── requireSuperAdmin ────────────────────────────────────────────────────────
+const requireSuperAdmin = async (req, res, next) => {
+  try {
+    if (!req.user.isSuperAdmin()) {
+      return errorResponse(res, "Superadmin access required.", 403);
+    }
+    const role = await Role.getForUser(req.user._id);
+    if (!role.isValid || !role.isSuperAdmin()) {
+      return errorResponse(res, "Superadmin access required or role has expired.", 403);
+    }
+    req.systemRole = role;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  protect,
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  requireBoardAccess,
+  requireAdmin,
+  requireSuperAdmin,
+};

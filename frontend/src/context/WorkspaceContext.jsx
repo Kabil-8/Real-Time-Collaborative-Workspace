@@ -67,6 +67,31 @@ export const WorkspaceProvider = ({ children }) => {
     }
   }, []);
 
+  const removeMember = useCallback(async (workspaceId, userId) => {
+    try {
+      await api.delete(`/workspaces/${workspaceId}/members/${userId}`);
+      setWorkspaces((prev) =>
+        prev.map((w) => {
+          if (w._id === workspaceId) {
+            const updatedMembers = w.members.filter((m) => (m.user?._id || m.user) !== userId);
+            return { ...w, members: updatedMembers };
+          }
+          return w;
+        })
+      );
+      if (activeWorkspace?._id === workspaceId) {
+        setActiveWorkspace((prev) => {
+          if (!prev) return null;
+          const updatedMembers = prev.members.filter((m) => (m.user?._id || m.user) !== userId);
+          return { ...prev, members: updatedMembers };
+        });
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || "Failed to remove member." };
+    }
+  }, [activeWorkspace]);
+
   const selectWorkspace = useCallback((workspace) => {
     setActiveWorkspace(workspace);
   }, []);
@@ -81,6 +106,7 @@ export const WorkspaceProvider = ({ children }) => {
         createWorkspace,
         updateWorkspace,
         inviteMember,
+        removeMember,
         selectWorkspace,
         setWorkspaces,
       }}

@@ -8,8 +8,11 @@ const {
   archiveWorkspace,
   inviteMember,
   acceptInvite,
+  rejectInvite,
+  getMyInvitations,
   removeMember,
   getWorkspaceBoards,
+  getWorkspaceAnalytics,
   createWorkspaceValidation,
   inviteMemberValidation,
 } = require("../controllers/workspaceController");
@@ -31,11 +34,15 @@ router.post(
 );
 router.get("/", getMyWorkspaces);
 
-// Accept invite (needs auth but not workspace membership yet)
+router.get("/invitations", getMyInvitations);
+
+// Accept/reject invite (needs auth but not workspace membership yet)
 router.post("/accept-invite/:token", acceptInvite);
+router.post("/reject-invite/:token", rejectInvite);
 
 router.get("/:workspaceId", getWorkspace);
 router.get("/:workspaceId/boards", requireWorkspaceMember, getWorkspaceBoards);
+router.get("/:workspaceId/analytics", requireWorkspaceMember, getWorkspaceAnalytics);
 
 router.patch(
   "/:workspaceId",
@@ -47,7 +54,7 @@ router.delete("/:workspaceId", archiveWorkspace);
 
 router.post(
   "/:workspaceId/invite",
-  requireWorkspaceAdmin,
+  requireWorkspaceMember,
   inviteMemberValidation,
   handleValidationErrors,
   inviteMember

@@ -54,7 +54,7 @@ const CreateWorkspaceModal = ({ onClose }) => {
             </div>
           )}
 
-         
+          {/* Preview */}
           <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-800/40 border border-slate-700/50">
             <span className="text-3xl">{form.icon}</span>
             <div>

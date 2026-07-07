@@ -25,9 +25,13 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("zaalima_token");
       localStorage.removeItem("zaalima_user");
-      // Only redirect if not already on auth pages
-      if (!window.location.pathname.startsWith("/login") &&
-          !window.location.pathname.startsWith("/register")) {
+      const path = window.location.pathname;
+      const isAuthPage =
+        path.startsWith("/login") ||
+        path.startsWith("/register") ||
+        path.startsWith("/forgot-password") ||
+        path.startsWith("/reset-password");
+      if (!isAuthPage) {
         window.location.href = "/login";
       }
     }

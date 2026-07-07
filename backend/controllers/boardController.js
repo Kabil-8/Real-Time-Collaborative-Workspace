@@ -3,6 +3,11 @@ const Board = require("../models/Board");
 const List = require("../models/List");
 const Card = require("../models/Card");
 const { successResponse, errorResponse } = require("../utils/response");
+const { getCache, setCache, delCache, delPattern } = require("../config/redis");
+
+// ─── Cache TTLs ───────────────────────────────────────────────────────────────
+const BOARD_TTL      = 60;   // seconds — full board hydration
+const BOARD_LIST_TTL = 30;   // seconds — workspace boards list
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -52,6 +57,9 @@ exports.createBoard = async (req, res, next) => {
     board.listOrder = listDocs.map((l) => l._id);
     await board.save();
 
+    // Invalidate workspace boards list cache
+    await delCache(`workspace:${workspaceId}:boards`);
+
     return successResponse(res, { board }, "Board created.", 201);
   } catch (err) {
     next(err);
@@ -61,12 +69,24 @@ exports.createBoard = async (req, res, next) => {
 /**
  * GET /api/boards/:boardId
  * Full board hydration: board + lists + cards
+ * Cached in Redis for BOARD_TTL seconds.
  */
 exports.getBoard = async (req, res, next) => {
   try {
-    const board = await Board.findById(req.params.boardId)
+    const { boardId } = req.params;
+    const cacheKey = `board:${boardId}`;
+
+    // ── Try cache ──────────────────────────────────────────────────────────
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return successResponse(res, cached);
+    }
+
+    // ── DB fetch ───────────────────────────────────────────────────────────
+    const board = await Board.findById(boardId)
       .populate("createdBy", "name avatar avatarColor")
-      .populate("members.user", "name email avatar avatarColor");
+      .populate("members.user", "name email avatar avatarColor")
+      .lean();
 
     if (!board || board.isArchived) {
       return errorResponse(res, "Board not found.", 404);
@@ -74,13 +94,15 @@ exports.getBoard = async (req, res, next) => {
 
     // Fetch all lists for this board in position order
     const lists = await List.find({ board: board._id, isArchived: false })
-      .sort({ position: 1 });
+      .sort({ position: 1 })
+      .lean();
 
     // Fetch all cards for this board in position order
     const cards = await Card.find({ board: board._id, isArchived: false })
       .populate("assignees", "name avatar avatarColor")
       .populate("createdBy", "name avatar avatarColor")
-      .sort({ position: 1 });
+      .sort({ position: 1 })
+      .lean();
 
     // Group cards by list
     const cardsByList = {};
@@ -91,11 +113,16 @@ exports.getBoard = async (req, res, next) => {
     });
 
     const listsWithCards = lists.map((list) => ({
-      ...list.toObject(),
+      ...list,
       cards: cardsByList[list._id.toString()] || [],
     }));
 
-    return successResponse(res, { board, lists: listsWithCards });
+    const payload = { board, lists: listsWithCards };
+
+    // ── Store in cache ─────────────────────────────────────────────────────
+    await setCache(cacheKey, payload, BOARD_TTL);
+
+    return successResponse(res, payload);
   } catch (err) {
     next(err);
   }
@@ -106,6 +133,7 @@ exports.getBoard = async (req, res, next) => {
  */
 exports.updateBoard = async (req, res, next) => {
   try {
+    const { boardId } = req.params;
     const allowed = ["title", "description", "background", "isStarred"];
     const updates = {};
     allowed.forEach((k) => {
@@ -113,12 +141,17 @@ exports.updateBoard = async (req, res, next) => {
     });
     updates.lastActivity = new Date();
 
-    const board = await Board.findByIdAndUpdate(req.params.boardId, updates, {
+    const board = await Board.findByIdAndUpdate(boardId, updates, {
       new: true,
       runValidators: true,
-    });
+    }).lean();
 
     if (!board) return errorResponse(res, "Board not found.", 404);
+
+    // Invalidate board cache
+    await delCache(`board:${boardId}`);
+    await delCache(`workspace:${board.workspace}:boards`);
+
     return successResponse(res, { board }, "Board updated.");
   } catch (err) {
     next(err);
@@ -130,7 +163,14 @@ exports.updateBoard = async (req, res, next) => {
  */
 exports.archiveBoard = async (req, res, next) => {
   try {
-    await Board.findByIdAndUpdate(req.params.boardId, { isArchived: true });
+    const { boardId } = req.params;
+    const board = await Board.findByIdAndUpdate(boardId, { isArchived: true }).lean();
+
+    if (board) {
+      await delCache(`board:${boardId}`);
+      await delCache(`workspace:${board.workspace}:boards`);
+    }
+
     return successResponse(res, {}, "Board archived.");
   } catch (err) {
     next(err);

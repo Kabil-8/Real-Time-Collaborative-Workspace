@@ -3,10 +3,13 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard, Trello, Bell, Search, Settings,
   ChevronDown, Plus, LogOut, User, Hash,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Sun, Moon
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
+import { useTheme } from "../../context/ThemeContext";
+import { useNotifications } from "../../context/NotificationContext";
+
 export const Avatar = ({ user, size = "sm" }) => {
   const sizes = { sm: "w-7 h-7 text-xs", md: "w-9 h-9 text-sm", lg: "w-11 h-11 text-base" };
   const initials = user?.name
@@ -30,17 +33,52 @@ export const Avatar = ({ user, size = "sm" }) => {
 };
 
 const NavItem = ({ icon: Icon, label, to, active, badge }) => (
-  <Link to={to}
-    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150
-      ${active
-        ? "bg-violet-500/15 text-violet-300 shadow-sm"
-        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-      }`}
+  <Link
+    to={to}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "9px 12px",
+      borderRadius: "var(--radius-md)",
+      fontSize: 14,
+      fontWeight: 500,
+      textDecoration: "none",
+      transition: "background var(--duration-fast), color var(--duration-fast)",
+      background: active ? "rgba(124, 58, 237, 0.12)" : "transparent",
+      color: active ? "var(--text-brand)" : "var(--text-secondary)",
+    }}
+    onMouseEnter={e => {
+      if (!active) {
+        e.currentTarget.style.background = "var(--bg-surface-3)";
+        e.currentTarget.style.color = "var(--text-primary)";
+      }
+    }}
+    onMouseLeave={e => {
+      if (!active) {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = "var(--text-secondary)";
+      }
+    }}
   >
-    <Icon size={17} className="flex-shrink-0" />
-    <span className="flex-1">{label}</span>
+    <Icon size={17} style={{ flexShrink: 0 }} />
+    <span style={{ flex: 1 }}>{label}</span>
     {badge != null && (
-      <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-violet-500/20 text-violet-300 text-xs flex items-center justify-center">
+      <span
+        style={{
+          minWidth: 20,
+          height: 20,
+          padding: "0 6px",
+          borderRadius: 999,
+          background: active ? "rgba(124,58,237,0.20)" : "var(--bg-surface-4)",
+          color: active ? "var(--text-brand)" : "var(--text-tertiary)",
+          fontSize: 11,
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         {badge}
       </span>
     )}
@@ -52,48 +90,138 @@ const WorkspaceSwitcher = ({ onCreateClick }) => {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800
-          border border-slate-700/50 transition-all duration-150 group"
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          borderRadius: "var(--radius-lg)",
+          background: "var(--bg-surface-2)",
+          border: "1px solid var(--border-default)",
+          cursor: "pointer",
+          transition: "background var(--duration-fast), border-color var(--duration-fast)",
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "var(--bg-surface-3)";
+          e.currentTarget.style.borderColor = "var(--border-strong)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "var(--bg-surface-2)";
+          e.currentTarget.style.borderColor = "var(--border-default)";
+        }}
       >
-        <span className="text-xl leading-none">{activeWorkspace?.icon || "🏢"}</span>
-        <div className="flex-1 min-w-0 text-left">
-          <p className="text-sm font-semibold text-white truncate leading-tight">
+        <span style={{ fontSize: 20, lineHeight: 1 }}>{activeWorkspace?.icon || "🏢"}</span>
+        <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+          <p style={{
+            fontSize: 13, fontWeight: 600, color: "var(--text-primary)",
+            margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
             {activeWorkspace?.name || "Select workspace"}
           </p>
-          <p className="text-xs text-slate-500 leading-tight">
+          <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>
             {activeWorkspace?.members?.length || 0} members
           </p>
         </div>
-        <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={14}
+          style={{
+            color: "var(--text-muted)",
+            transition: "transform 0.2s",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            flexShrink: 0,
+          }}
+        />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 bg-slate-900 border border-slate-700
-          rounded-xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
-          <div className="p-1.5 max-h-52 overflow-y-auto">
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            right: 0,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: "var(--shadow-lg)",
+            zIndex: 50,
+            overflow: "hidden",
+          }}
+        >
+          <div style={{ padding: 6, maxHeight: 208, overflowY: "auto" }}>
             {workspaces.map((ws) => (
               <button
                 key={ws._id}
                 onClick={() => { selectWorkspace(ws); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors
-                  ${activeWorkspace?._id === ws._id
-                    ? "bg-violet-500/15 text-violet-300"
-                    : "text-slate-300 hover:bg-slate-800"
-                  }`}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background var(--duration-fast)",
+                  background: activeWorkspace?._id === ws._id
+                    ? "rgba(124,58,237,0.12)"
+                    : "transparent",
+                  color: activeWorkspace?._id === ws._id
+                    ? "var(--text-brand)"
+                    : "var(--text-secondary)",
+                }}
+                onMouseEnter={e => {
+                  if (activeWorkspace?._id !== ws._id) {
+                    e.currentTarget.style.background = "var(--bg-surface-3)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (activeWorkspace?._id !== ws._id) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }
+                }}
               >
-                <span className="text-base">{ws.icon}</span>
-                <span className="truncate font-medium">{ws.name}</span>
+                <span style={{ fontSize: 16 }}>{ws.icon}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {ws.name}
+                </span>
               </button>
             ))}
           </div>
-          <div className="border-t border-slate-800 p-1.5">
+          <div style={{ borderTop: "1px solid var(--border-subtle)", padding: 6 }}>
             <button
               onClick={() => { onCreateClick(); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-400
-                hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 12px",
+                borderRadius: "var(--radius-md)",
+                fontSize: 13,
+                fontWeight: 500,
+                border: "none",
+                cursor: "pointer",
+                background: "transparent",
+                color: "var(--text-tertiary)",
+                transition: "background var(--duration-fast), color var(--duration-fast)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "var(--bg-surface-3)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-tertiary)";
+              }}
             >
               <Plus size={15} />
               <span>New workspace</span>
@@ -108,6 +236,8 @@ const WorkspaceSwitcher = ({ onCreateClick }) => {
 const Sidebar = ({ onCreateWorkspace, collapsed, onToggleCollapse }) => {
   const { user, logout } = useAuth();
   const { activeWorkspace } = useWorkspace();
+  const { toggleTheme, isDark } = useTheme();
+  const { unreadCount } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -120,51 +250,68 @@ const Sidebar = ({ onCreateWorkspace, collapsed, onToggleCollapse }) => {
 
   if (collapsed) {
     return (
-      <aside className="w-16 h-screen flex flex-col bg-slate-950 border-r border-slate-800/50 py-4 items-center gap-2">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600
-          flex items-center justify-center text-white font-bold text-lg mb-2 shadow-lg shadow-violet-500/20">
-          Z
-        </div>
-        <button onClick={onToggleCollapse}
-          className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors">
-          <ChevronRight size={16} />
-        </button>
+      <aside
+        className="sidebar-bg"
+        style={{
+          width: 64, height: "100vh", display: "flex", flexDirection: "column",
+          background: "var(--bg-surface)", borderRight: "1px solid var(--border-subtle)",
+          padding: "16px 0", alignItems: "center", gap: 8, flexShrink: 0,
+          transition: "background var(--transition-slow)",
+        }}
+      >
+        <div style={{
+          width: 36, height: 36, borderRadius: 12,
+          background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontWeight: 800, fontSize: 18, marginBottom: 8,
+          boxShadow: "0 4px 12px rgba(139,92,246,.4)",
+        }}>Z</div>
+        <button className="btn-icon" onClick={onToggleCollapse}><ChevronRight size={16} /></button>
       </aside>
     );
   }
 
   return (
-    <aside className="w-64 h-screen flex flex-col bg-slate-950 border-r border-slate-800/50 flex-shrink-0">
+    <aside
+      className="sidebar-bg"
+      style={{
+        width: 256, height: "100vh", display: "flex", flexDirection: "column",
+        background: "var(--bg-surface)", borderRight: "1px solid var(--border-subtle)",
+        flexShrink: 0, transition: "background var(--transition-slow)",
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-slate-800/50">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600
-          flex items-center justify-center text-white font-bold shadow-lg shadow-violet-500/20 flex-shrink-0">
-          Z
-        </div>
-        <span className="text-white font-bold tracking-tight text-lg flex-1">Zaalima</span>
-        <button onClick={onToggleCollapse}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors">
-          <ChevronLeft size={15} />
-        </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px", borderBottom: "1px solid var(--border-subtle)" }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 10,
+          background: "linear-gradient(135deg, #8b5cf6, #6366f1)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff", fontWeight: 800, fontSize: 16, flexShrink: 0,
+          boxShadow: "0 4px 12px rgba(139,92,246,.4)",
+        }}>Z</div>
+        <span style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: 18, letterSpacing: "-.02em", flex: 1 }}>Zaalima</span>
+        <button className="btn-icon" onClick={onToggleCollapse}><ChevronLeft size={15} /></button>
       </div>
 
       {/* Workspace switcher */}
-      <div className="px-3 py-3 border-b border-slate-800/50">
+      <div style={{ padding: "12px", borderBottom: "1px solid var(--border-subtle)" }}>
         <WorkspaceSwitcher onCreateClick={onCreateWorkspace} />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      <nav style={{ flex: 1, padding: "12px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
         <NavItem icon={LayoutDashboard} label="Home" to="/" active={location.pathname === "/"} />
         <NavItem icon={Search} label="Search" to="/search" active={isActive("/search")} />
-        <NavItem icon={Bell} label="Notifications" to="/notifications" active={isActive("/notifications")} badge={3} />
+        <NavItem icon={Bell} label="Notifications" to="/notifications" active={isActive("/notifications")} badge={unreadCount > 0 ? unreadCount : undefined} />
 
         {activeWorkspace && (
           <>
-            <div className="pt-4 pb-1.5">
-              <p className="px-3 text-[11px] font-semibold uppercase tracking-widest text-slate-600">
-                Workspace
-              </p>
+            <div style={{ paddingTop: 16, paddingBottom: 6 }}>
+              <p style={{
+                paddingLeft: 12, fontSize: 11, fontWeight: 700,
+                textTransform: "uppercase", letterSpacing: ".08em",
+                color: "var(--text-muted)",
+              }}>Workspace</p>
             </div>
             <NavItem icon={Trello} label="Boards" to="/boards" active={isActive("/boards")} />
             <NavItem icon={Hash} label="Members" to={`/workspace/${activeWorkspace._id}/members`}
@@ -176,19 +323,55 @@ const Sidebar = ({ onCreateWorkspace, collapsed, onToggleCollapse }) => {
         )}
       </nav>
 
-      {/* User profile footer */}
-      <div className="px-3 py-3 border-t border-slate-800/50">
-        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-slate-800/60 transition-colors group cursor-pointer">
+      {/* Footer */}
+      <div style={{ padding: "12px", borderTop: "1px solid var(--border-subtle)" }}>
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, width: "100%",
+            padding: "8px 12px", borderRadius: "var(--radius-md)",
+            background: "transparent", border: "none",
+            color: "var(--text-secondary)", fontSize: 13, fontWeight: 500,
+            cursor: "pointer", marginBottom: 4,
+            transition: "background var(--duration-fast), color var(--duration-fast)",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = "var(--bg-surface-3)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
+        >
+          {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          {isDark ? "Light mode" : "Dark mode"}
+        </button>
+
+        {/* User row */}
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 12px", borderRadius: "var(--radius-md)",
+          }}
+        >
           <Avatar user={user} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{
+              fontSize: 13, fontWeight: 600, color: "var(--text-primary)",
+              margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{user?.name}</p>
+            <p style={{
+              fontSize: 11.5, color: "var(--text-muted)",
+              margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{user?.email}</p>
           </div>
           <button
             onClick={handleLogout}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500
-              hover:text-red-400 hover:bg-red-500/10 transition-all"
+            className="btn-icon"
             title="Sign out"
+            style={{ color: "var(--text-muted)" }}
           >
             <LogOut size={14} />
           </button>

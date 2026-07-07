@@ -2,6 +2,7 @@ const { body } = require("express-validator");
 const Workspace = require("../models/Workspace");
 const User = require("../models/User");
 const Board = require("../models/Board");
+const Card = require("../models/Card");
 const { successResponse, errorResponse } = require("../utils/response");
 
 // ─── Validation chains ────────────────────────────────────────────────────────
@@ -151,6 +152,17 @@ exports.inviteMember = async (req, res, next) => {
     const { email, role = "member" } = req.body;
     const workspace = req.workspace;
 
+    // Privilege check
+    const userRole = req.userRole;
+    if (!["owner", "admin"].includes(userRole)) {
+      if (userRole !== "member" || workspace.settings?.allowMemberInvites === false) {
+        return errorResponse(res, "Admin or owner privileges required to invite members.", 403);
+      }
+      if (role === "admin") {
+        return errorResponse(res, "Standard members cannot invite users with the admin role.", 403);
+      }
+    }
+
     // Check if already a member
     const existingUser = await User.findOne({ email });
     if (existingUser && workspace.isMember(existingUser._id)) {
@@ -280,6 +292,219 @@ exports.getWorkspaceBoards = async (req, res, next) => {
       .sort({ lastActivity: -1 });
 
     return successResponse(res, { boards });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/workspaces/:workspaceId/analytics
+ * Get analytics for a workspace
+ */
+exports.getWorkspaceAnalytics = async (req, res, next) => {
+  try {
+    const { workspaceId } = req.params;
+    const workspace = await Workspace.findById(workspaceId)
+      .populate("members.user", "name email avatar avatarColor");
+
+    if (!workspace || workspace.isArchived) {
+      return errorResponse(res, "Workspace not found.", 404);
+    }
+
+    // 1. Get all active boards
+    const boards = await Board.find({ workspace: workspaceId, isArchived: false })
+      .select("title background");
+
+    const boardIds = boards.map(b => b._id);
+
+    // 2. Get all active cards
+    const cards = await Card.find({ board: { $in: boardIds }, isArchived: false })
+      .populate("list", "title")
+      .populate("board", "title");
+
+    // 3. Overall Stats
+    const totalBoards = boards.length;
+    const totalCards = cards.length;
+    const totalMembers = workspace.members.length;
+
+    // 4. Overdue and Due soon cards
+    const now = new Date();
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(now.getDate() + 3);
+
+    let overdueCount = 0;
+    let dueSoonCount = 0;
+    const urgentCards = [];
+
+    cards.forEach(card => {
+      if (card.dueDate) {
+        const dueDate = new Date(card.dueDate);
+        if (dueDate < now) {
+          overdueCount++;
+          urgentCards.push({
+            _id: card._id,
+            title: card.title,
+            board: card.board,
+            dueDate: card.dueDate,
+            status: "overdue"
+          });
+        } else if (dueDate <= threeDaysFromNow) {
+          dueSoonCount++;
+          urgentCards.push({
+            _id: card._id,
+            title: card.title,
+            board: card.board,
+            dueDate: card.dueDate,
+            status: "due_soon"
+          });
+        }
+      }
+    });
+
+    // Sort urgent cards: overdue first, then soonest
+    urgentCards.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+    // Limit to 5 urgent cards
+    const urgentCardsLimit = urgentCards.slice(0, 5);
+
+    // 5. Card priority distribution
+    const priorityDistribution = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      none: 0
+    };
+    cards.forEach(card => {
+      const p = card.priority || "none";
+      if (priorityDistribution[p] !== undefined) {
+        priorityDistribution[p]++;
+      } else {
+        priorityDistribution["none"]++;
+      }
+    });
+
+    // 6. Cards per board distribution
+    const boardDistribution = {};
+    boards.forEach(b => {
+      boardDistribution[b.title] = 0;
+    });
+    cards.forEach(card => {
+      if (card.board && card.board.title) {
+        boardDistribution[card.board.title] = (boardDistribution[card.board.title] || 0) + 1;
+      }
+    });
+
+    // 7. Cards per list (status) distribution
+    const listDistribution = {};
+    cards.forEach(card => {
+      if (card.list && card.list.title) {
+        const title = card.list.title.trim();
+        listDistribution[title] = (listDistribution[title] || 0) + 1;
+      }
+    });
+
+    // 8. Assignee load
+    const assigneeLoad = {};
+    // Seed with all workspace members
+    workspace.members.forEach(member => {
+      if (member.user) {
+        assigneeLoad[member.user._id.toString()] = {
+          _id: member.user._id,
+          name: member.user.name,
+          email: member.user.email,
+          avatar: member.user.avatar,
+          avatarColor: member.user.avatarColor,
+          cardCount: 0
+        };
+      }
+    });
+
+    cards.forEach(card => {
+      if (card.assignees && card.assignees.length > 0) {
+        card.assignees.forEach(assigneeId => {
+          const idStr = assigneeId.toString();
+          if (assigneeLoad[idStr]) {
+            assigneeLoad[idStr].cardCount++;
+          }
+        });
+      }
+    });
+
+    const assigneeLoadArray = Object.values(assigneeLoad).sort((a, b) => b.cardCount - a.cardCount);
+
+    return successResponse(res, {
+      analytics: {
+        stats: {
+          totalBoards,
+          totalCards,
+          totalMembers,
+          overdueCount,
+          dueSoonCount
+        },
+        priorityDistribution,
+        boardDistribution,
+        listDistribution,
+        assigneeLoad: assigneeLoadArray,
+        urgentCards: urgentCardsLimit
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/workspaces/invitations
+ * Get all workspaces where the current user has a pending invitation
+ */
+exports.getMyInvitations = async (req, res, next) => {
+  try {
+    const workspaces = await Workspace.find({
+      "pendingInvites.email": req.user.email,
+      "pendingInvites.usedAt": null,
+      "pendingInvites.expiresAt": { $gt: new Date() },
+    }).populate("owner", "name email avatar avatarColor")
+      .select("name description icon color owner pendingInvites");
+
+    const invitations = workspaces.map((ws) => {
+      const invite = ws.pendingInvites.find(
+        (inv) => inv.email === req.user.email && !inv.usedAt && inv.expiresAt > new Date()
+      );
+      return {
+        _id: ws._id,
+        name: ws.name,
+        icon: ws.icon,
+        color: ws.color,
+        owner: ws.owner,
+        inviteToken: invite.token,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+      };
+    });
+
+    return successResponse(res, { invitations });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/workspaces/reject-invite/:token
+ * Reject a workspace invitation
+ */
+exports.rejectInvite = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const workspace = await Workspace.findOne({ "pendingInvites.token": token });
+    if (!workspace) return errorResponse(res, "Invite not found.", 404);
+
+    const invite = workspace.pendingInvites.find((inv) => inv.token === token);
+    if (invite) {
+      invite.usedAt = new Date(); // mark as used/resolved
+      await workspace.save();
+    }
+    return successResponse(res, {}, "Invitation rejected.");
   } catch (err) {
     next(err);
   }

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
+
 const memberSchema = new mongoose.Schema(
   {
     user: {
@@ -137,14 +138,18 @@ workspaceSchema.pre("save", function (next) {
 });
 
 // Helper: check if user is a member
+// Works whether m.user is a raw ObjectId OR a populated object
 workspaceSchema.methods.isMember = function (userId) {
-  return this.members.some((m) => m.user.toString() === userId.toString());
+  return this.members.some(
+    (m) => (m.user._id || m.user).toString() === userId.toString()
+  );
 };
 
 // Helper: get a member's role
+// Works whether m.user is a raw ObjectId OR a populated object
 workspaceSchema.methods.getMemberRole = function (userId) {
   const member = this.members.find(
-    (m) => m.user.toString() === userId.toString()
+    (m) => (m.user._id || m.user).toString() === userId.toString()
   );
   return member ? member.role : null;
 };
