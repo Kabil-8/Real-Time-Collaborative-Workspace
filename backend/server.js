@@ -6,16 +6,19 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 
 const connectDB = require("./config/db");
+const { connectRedis, disconnectRedis } = require("./config/redis");
 const errorHandler = require("./middleware/errorHandler");
 const { initSocket, getSocketStats } = require("./socket");
+const { getCacheStats } = require("./utils/cache");
 
-const authRoutes = require("./routes/auth");
-const workspaceRoutes = require("./routes/workspaces");
-const boardRoutes = require("./routes/boards");
-const listRoutes = require("./routes/lists");
-const cardRoutes = require("./routes/cards");
+const authRoutes         = require("./routes/auth");
+const workspaceRoutes    = require("./routes/workspaces");
+const boardRoutes        = require("./routes/boards");
+const listRoutes         = require("./routes/lists");
+const cardRoutes         = require("./routes/cards");
 const searchRoutes       = require("./routes/search");
 const notificationRoutes = require("./routes/notifications");
+const cacheRoutes        = require("./routes/cache");
 
 // ─── App & HTTP server setup ──────────────────────────────────────────────────
 const app = express();
@@ -24,6 +27,9 @@ const httpServer = http.createServer(app);
 // ─── Socket.io — Day 1-2: JWT auth + connection/disconnect handling ───────────
 // All socket logic lives in ./socket/ (authMiddleware, presenceManager, handlers)
 const io = initSocket(httpServer, app);
+
+// ─── Redis — Day 3-4: Cache layer for high-traffic board reads ────────────────
+connectRedis();
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
 app.use(helmet());
@@ -56,22 +62,25 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth", authRoutes);
-app.use("/api/workspaces", workspaceRoutes);
-app.use("/api/boards", boardRoutes);
-app.use("/api/lists", listRoutes);
-app.use("/api/cards", cardRoutes);
+app.use("/api/auth",          authRoutes);
+app.use("/api/workspaces",    workspaceRoutes);
+app.use("/api/boards",        boardRoutes);
+app.use("/api/lists",         listRoutes);
+app.use("/api/cards",         cardRoutes);
 app.use("/api/search",        searchRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/cache",         cacheRoutes);
 
-// ─── Health check (includes live socket stats) ────────────────────────────────
-app.get("/api/health", (req, res) => {
+// ─── Health check (includes live socket + cache stats) ───────────────────────
+app.get("/api/health", async (req, res) => {
+  const cacheStats = await getCacheStats();
   res.json({
     success: true,
     message: "Zaalima Workspace API is running",
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV,
     socket: getSocketStats(), // { connectedSockets, onlineUsers, activeRooms }
+    cache: cacheStats,        // { status, version, uptimeSeconds, ttls }
   });
 });
 

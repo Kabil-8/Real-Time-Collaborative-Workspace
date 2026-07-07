@@ -3,6 +3,14 @@ const Board = require("../models/Board");
 const List = require("../models/List");
 const Card = require("../models/Card");
 const { successResponse, errorResponse } = require("../utils/response");
+const {
+  CacheKeys,
+  TTL,
+  cacheGet,
+  cacheSet,
+  cacheInvalidate,
+  invalidateBoardCache,
+} = require("../utils/cache");
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -61,10 +69,21 @@ exports.createBoard = async (req, res, next) => {
 /**
  * GET /api/boards/:boardId
  * Full board hydration: board + lists + cards
+ * ── Cache-aside: check Redis first, fall back to MongoDB on miss ──────────────
  */
 exports.getBoard = async (req, res, next) => {
   try {
-    const board = await Board.findById(req.params.boardId)
+    const { boardId } = req.params;
+    const cacheKey = CacheKeys.board(boardId);
+
+    // ── 1. Cache read ─────────────────────────────────────────────────────────
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return successResponse(res, cached);
+    }
+
+    // ── 2. DB fetch on cache miss ─────────────────────────────────────────────
+    const board = await Board.findById(boardId)
       .populate("createdBy", "name avatar avatarColor")
       .populate("members.user", "name email avatar avatarColor");
 
@@ -95,7 +114,12 @@ exports.getBoard = async (req, res, next) => {
       cards: cardsByList[list._id.toString()] || [],
     }));
 
-    return successResponse(res, { board, lists: listsWithCards });
+    const payload = { board, lists: listsWithCards };
+
+    // ── 3. Populate cache ─────────────────────────────────────────────────────
+    await cacheSet(cacheKey, payload, TTL.BOARD);
+
+    return successResponse(res, payload);
   } catch (err) {
     next(err);
   }
@@ -119,6 +143,10 @@ exports.updateBoard = async (req, res, next) => {
     });
 
     if (!board) return errorResponse(res, "Board not found.", 404);
+
+    // ── Invalidate board cache on any mutation ────────────────────────────────
+    await invalidateBoardCache(req.params.boardId);
+
     return successResponse(res, { board }, "Board updated.");
   } catch (err) {
     next(err);
@@ -131,6 +159,10 @@ exports.updateBoard = async (req, res, next) => {
 exports.archiveBoard = async (req, res, next) => {
   try {
     await Board.findByIdAndUpdate(req.params.boardId, { isArchived: true });
+
+    // ── Invalidate all cache entries for this board ───────────────────────────
+    await invalidateBoardCache(req.params.boardId);
+
     return successResponse(res, {}, "Board archived.");
   } catch (err) {
     next(err);

@@ -11,18 +11,43 @@ const {
   emitListDuplicated,
   emitListReordered,
 } = require("../socket/emitters/listEmitter");
+const {
+  CacheKeys,
+  TTL,
+  cacheGet,
+  cacheSet,
+  cacheInvalidate,
+  invalidateBoardCache,
+} = require("../utils/cache");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Verify the requesting user is a member of the board that owns the list */
+/**
+ * Verify the requesting user is a member of the board that owns the list.
+ * Board doc is cached under board_members:{boardId} to skip redundant DB reads.
+ */
 const assertBoardMember = async (boardId, userId) => {
-  const board = await Board.findById(boardId);
+  const membersKey = CacheKeys.boardMembers(boardId);
+
+  // Try cache first
+  let board = await cacheGet(membersKey);
+
+  if (!board) {
+    // Cache miss — fetch from DB and cache the result
+    board = await Board.findById(boardId);
+    if (board) {
+      await cacheSet(membersKey, board.toObject ? board.toObject() : board, TTL.MEMBERS);
+    }
+  }
+
   if (!board || board.isArchived) return { error: "Board not found.", status: 404 };
   const isMember = board.members.some(
     (m) => m.user.toString() === userId.toString()
   );
   if (!isMember) return { error: "Access denied.", status: 403 };
-  return { board };
+
+  // Re-hydrate as Mongoose doc when possible (needed for .save() callers)
+  return { board: await Board.findById(boardId) };
 };
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -77,6 +102,9 @@ exports.createList = async (req, res, next) => {
     board.lastActivity = new Date();
     await board.save();
 
+    // ── Invalidate board & lists cache so next read is fresh ─────────────────
+    await invalidateBoardCache(boardId);
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { list }, "List created.", 201);
 
@@ -90,7 +118,8 @@ exports.createList = async (req, res, next) => {
 
 /**
  * GET /api/lists/board/:boardId
- * Get all (active) lists for a board, ordered by position, with cards populated
+ * Get all (active) lists for a board, ordered by position, with cards populated.
+ * ── Cache-aside: check Redis first, fall back to MongoDB on miss ──────────────
  */
 exports.getListsByBoard = async (req, res, next) => {
   try {
@@ -99,6 +128,15 @@ exports.getListsByBoard = async (req, res, next) => {
     const { error, status } = await assertBoardMember(boardId, req.user._id);
     if (error) return errorResponse(res, error, status);
 
+    const cacheKey = CacheKeys.lists(boardId);
+
+    // ── 1. Cache read ─────────────────────────────────────────────────────────
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return successResponse(res, cached);
+    }
+
+    // ── 2. DB fetch on cache miss ─────────────────────────────────────────────
     const lists = await List.find({ board: boardId, isArchived: false })
       .sort({ position: 1 })
       .populate({
@@ -108,6 +146,9 @@ exports.getListsByBoard = async (req, res, next) => {
         populate: { path: "assignees", select: "name avatar avatarColor" },
         options: { sort: { position: 1 } },
       });
+
+    // ── 3. Populate cache ─────────────────────────────────────────────────────
+    await cacheSet(cacheKey, { lists }, TTL.LISTS);
 
     return successResponse(res, { lists });
   } catch (err) {
@@ -162,6 +203,9 @@ exports.updateList = async (req, res, next) => {
       runValidators: true,
     });
 
+    // ── Invalidate board & lists cache ────────────────────────────────────────
+    await invalidateBoardCache(list.board.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { list: updated }, "List updated.");
 
@@ -209,6 +253,9 @@ exports.moveList = async (req, res, next) => {
       lastActivity: new Date(),
     });
 
+    // ── Invalidate board & lists cache ────────────────────────────────────────
+    await invalidateBoardCache(boardId.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, {}, "List moved.");
 
@@ -244,6 +291,9 @@ exports.archiveList = async (req, res, next) => {
       $pull: { listOrder: list._id },
       lastActivity: new Date(),
     });
+
+    // ── Invalidate board & lists cache ────────────────────────────────────────
+    await invalidateBoardCache(list.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, {}, "List archived.");
@@ -288,6 +338,9 @@ exports.restoreList = async (req, res, next) => {
       select: "title priority dueDate assignees coverColor labels position",
       populate: { path: "assignees", select: "name avatar avatarColor" },
     });
+
+    // ── Invalidate board & lists cache ────────────────────────────────────────
+    await invalidateBoardCache(list.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { list: populated }, "List restored.");
@@ -364,6 +417,9 @@ exports.duplicateList = async (req, res, next) => {
       select: "title priority dueDate assignees coverColor labels position",
       populate: { path: "assignees", select: "name avatar avatarColor" },
     });
+
+    // ── Invalidate board & lists cache ────────────────────────────────────────
+    await invalidateBoardCache(source.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { list: populated }, "List duplicated.", 201);

@@ -15,6 +15,14 @@ const {
   emitCommentDeleted,
 } = require("../socket/emitters/cardEmitter");
 const notifyUser = require("../utils/notifyUser");
+const {
+  CacheKeys,
+  TTL,
+  cacheGet,
+  cacheSet,
+  invalidateBoardCache,
+  invalidateCardCache,
+} = require("../utils/cache");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,6 +133,9 @@ exports.createCard = async (req, res, next) => {
 
     const populated = await card.populate("assignees", "name avatar avatarColor");
 
+    // ── Invalidate board & lists cache (new card changes list cardinality) ─────
+    await invalidateBoardCache(boardId);
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: populated }, "Card created.", 201);
 
@@ -163,10 +174,24 @@ exports.getCardsByList = async (req, res, next) => {
 /**
  * GET /api/cards/:cardId
  * Get a single card with full details
+ * ── Cache-aside: check Redis first, fall back to MongoDB on miss ──────────────
  */
 exports.getCard = async (req, res, next) => {
   try {
-    const card = await Card.findById(req.params.cardId)
+    const { cardId } = req.params;
+    const cacheKey = CacheKeys.card(cardId);
+
+    // ── 1. Cache read ─────────────────────────────────────────────────────────
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      // Still verify board membership (security must not be cached away)
+      const { error, status } = await assertBoardMember(cached.card.board, req.user._id);
+      if (error) return errorResponse(res, error, status);
+      return successResponse(res, cached);
+    }
+
+    // ── 2. DB fetch on cache miss ─────────────────────────────────────────────
+    const card = await Card.findById(cardId)
       .populate("assignees", "name avatar avatarColor")
       .populate("createdBy", "name avatar avatarColor")
       .populate("comments.author", "name avatar avatarColor")
@@ -176,6 +201,9 @@ exports.getCard = async (req, res, next) => {
 
     const { error, status } = await assertBoardMember(card.board, req.user._id);
     if (error) return errorResponse(res, error, status);
+
+    // ── 3. Populate cache ─────────────────────────────────────────────────────
+    await cacheSet(cacheKey, { card }, TTL.CARD);
 
     return successResponse(res, { card });
   } catch (err) {
@@ -220,6 +248,9 @@ exports.updateCard = async (req, res, next) => {
 
     // Bump board lastActivity
     await Board.findByIdAndUpdate(updated.board, { lastActivity: new Date() });
+
+    // ── Invalidate card & board cache ─────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, updated.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: updated }, "Card updated.");
@@ -333,6 +364,9 @@ exports.moveCard = async (req, res, next) => {
 
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
 
+    // ── Invalidate card & board cache ─────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card }, "Card moved.");
 
@@ -392,6 +426,9 @@ exports.duplicateCard = async (req, res, next) => {
 
     const populated = await newCard.populate("assignees", "name avatar avatarColor");
 
+    // ── Invalidate board & lists cache (new card changes structure) ───────────
+    await invalidateBoardCache(source.board.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: populated }, "Card duplicated.", 201);
 
@@ -425,6 +462,9 @@ exports.addComment = async (req, res, next) => {
     await card.populate("comments.author", "name avatar avatarColor");
 
     const comment = card.comments[card.comments.length - 1];
+
+    // ── Invalidate card cache (new comment changes card state) ────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { comment }, "Comment added.", 201);
@@ -486,6 +526,9 @@ exports.editComment = async (req, res, next) => {
 
     const updated = card.comments.id(req.params.commentId);
 
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { comment: updated }, "Comment updated.");
 
@@ -524,6 +567,9 @@ exports.deleteComment = async (req, res, next) => {
     comment.deleteOne();
     await card.save();
 
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
+
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, {}, "Comment deleted.");
 
@@ -553,6 +599,9 @@ exports.addChecklist = async (req, res, next) => {
     card.checklists.push({ title: title?.trim() || "Checklist", items: [] });
     await card.save();
 
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
+
     const checklist = card.checklists[card.checklists.length - 1];
     return successResponse(res, { checklist }, "Checklist added.", 201);
   } catch (err) {
@@ -577,6 +626,9 @@ exports.deleteChecklist = async (req, res, next) => {
 
     checklist.deleteOne();
     await card.save();
+
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
 
     return successResponse(res, {}, "Checklist deleted.");
   } catch (err) {
@@ -604,6 +656,9 @@ exports.addChecklistItem = async (req, res, next) => {
 
     checklist.items.push({ text: text.trim(), completed: false });
     await card.save();
+
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
 
     const item = checklist.items[checklist.items.length - 1];
     return successResponse(res, { item }, "Checklist item added.", 201);
@@ -638,6 +693,10 @@ exports.updateChecklistItem = async (req, res, next) => {
     }
 
     await card.save();
+
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
+
     return successResponse(res, { item }, "Checklist item updated.");
   } catch (err) {
     next(err);
@@ -664,6 +723,9 @@ exports.deleteChecklistItem = async (req, res, next) => {
 
     item.deleteOne();
     await card.save();
+
+    // ── Invalidate card cache ─────────────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
 
     return successResponse(res, {}, "Checklist item deleted.");
   } catch (err) {
@@ -692,6 +754,9 @@ exports.archiveCard = async (req, res, next) => {
     // Remove from list cardOrder
     await List.findByIdAndUpdate(card.list, { $pull: { cardOrder: card._id } });
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
+
+    // ── Invalidate card & board cache ─────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, boardId);
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, {}, "Card archived.");
@@ -725,6 +790,9 @@ exports.restoreCard = async (req, res, next) => {
     await Board.findByIdAndUpdate(card.board, { lastActivity: new Date() });
 
     const populated = await card.populate("assignees", "name avatar avatarColor");
+
+    // ── Invalidate card & board cache ─────────────────────────────────────────
+    await invalidateCardCache(req.params.cardId, card.board.toString());
 
     // ── HTTP response first ───────────────────────────────────────────────────
     successResponse(res, { card: populated }, "Card restored.");
