@@ -33,3 +33,13 @@ Runs on http://localhost:3000.
 - Week 2 backend endpoints for lists/cards/move are implemented in
   `backend/routes/boards.js`; the frontend Kanban drag-and-drop UI is
   deferred to Week 2 commits.
+
+## Quick Git workflow
+
+From the project root, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\git-push.ps1 -Message "your commit message"
+```
+
+This stages all changes, creates a commit, and pushes to the `shivang` branch.
