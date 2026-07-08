@@ -1,0 +1,8 @@
+{
+  "short_name": "Zaalima",
+  "name": "Zaalima Workspace",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#312e81",
+  "background_color": "#0f172a"
+}

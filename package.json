@@ -1,0 +1,10 @@
+{
+  "name": "zaalima-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "npx --yes http-server .preview -p 8080 -c-1",
+    "build": "echo 'Nothing to build in root - see frontend/ and backend/'",
+    "start": "npx --yes http-server .preview -p 8080 -c-1"
+  }
+}

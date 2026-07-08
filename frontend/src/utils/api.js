@@ -1,37 +1,24 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
-  headers: { "Content-Type": "application/json" },
-  withCredentials: true,
+  baseURL: (process.env.REACT_APP_API_URL || "http://localhost:4000") + "/api",
 });
 
-// Attach JWT from localStorage on every request
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("zaalima_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-// Handle 401s globally — clear storage and redirect to login
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("zaalima_token");
-      localStorage.removeItem("zaalima_user");
-      // Only redirect if not already on auth pages
-      if (!window.location.pathname.startsWith("/login") &&
-          !window.location.pathname.startsWith("/register")) {
-        window.location.href = "/login";
-      }
+  (res) => res,
+  (err) => {
+    if (err.response && err.response.status === 401) {
+      localStorage.removeItem("token");
+      const p = window.location.pathname;
+      if (p !== "/login" && p !== "/register") window.location.href = "/login";
     }
-    return Promise.reject(error);
+    return Promise.reject(err);
   }
 );
 

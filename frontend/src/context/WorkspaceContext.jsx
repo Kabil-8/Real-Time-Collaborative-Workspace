@@ -1,99 +1,57 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import api from "../utils/api";
+import { useAuth } from "./AuthContext";
 
 const WorkspaceContext = createContext(null);
 
-export const WorkspaceProvider = ({ children }) => {
+export function WorkspaceProvider({ children }) {
+  const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState([]);
-  const [activeWorkspace, setActiveWorkspace] = useState(null);
-  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+  const [currentId, setCurrentId] = useState(() => localStorage.getItem("currentWorkspaceId"));
+  const [loading, setLoading] = useState(false);
 
-  const fetchWorkspaces = useCallback(async () => {
-    setLoadingWorkspaces(true);
+  const selectWorkspace = useCallback((id) => {
+    setCurrentId(id);
+    if (id) localStorage.setItem("currentWorkspaceId", id);
+    else localStorage.removeItem("currentWorkspaceId");
+  }, []);
+
+  const refresh = useCallback(async () => {
+    if (!user) { setWorkspaces([]); return; }
+    setLoading(true);
     try {
-      const { data } = await api.get("/workspaces");
-      setWorkspaces(data.workspaces);
-      // Auto-select first workspace if none active
-      if (!activeWorkspace && data.workspaces.length > 0) {
-        setActiveWorkspace(data.workspaces[0]);
-      }
-      return data.workspaces;
-    } catch (err) {
-      console.error("Failed to fetch workspaces", err);
-      return [];
+      const res = await api.get("/workspaces");
+      const list = res.data.data.workspaces || [];
+      setWorkspaces(list);
+      if (!currentId && list[0]) selectWorkspace(list[0]._id);
     } finally {
-      setLoadingWorkspaces(false);
+      setLoading(false);
     }
-  }, [activeWorkspace]);
+  }, [user, currentId, selectWorkspace]);
 
-  const createWorkspace = useCallback(async (payload) => {
-    try {
-      const { data } = await api.post("/workspaces", payload);
-      setWorkspaces((prev) => [data.workspace, ...prev]);
-      setActiveWorkspace(data.workspace);
-      return { success: true, workspace: data.workspace };
-    } catch (err) {
-      return {
-        success: false,
-        message: err.response?.data?.message || "Failed to create workspace.",
-      };
-    }
-  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  const updateWorkspace = useCallback(async (workspaceId, updates) => {
-    try {
-      const { data } = await api.patch(`/workspaces/${workspaceId}`, updates);
-      setWorkspaces((prev) =>
-        prev.map((w) => (w._id === workspaceId ? data.workspace : w))
-      );
-      if (activeWorkspace?._id === workspaceId) {
-        setActiveWorkspace(data.workspace);
-      }
-      return { success: true, workspace: data.workspace };
-    } catch (err) {
-      return { success: false, message: err.response?.data?.message };
-    }
-  }, [activeWorkspace]);
+  const createWorkspace = useCallback(async (name) => {
+    const res = await api.post("/workspaces", { name });
+    const ws = res.data.data.workspace;
+    setWorkspaces((prev) => [ws, ...prev]);
+    selectWorkspace(ws._id);
+    return ws;
+  }, [selectWorkspace]);
 
-  const inviteMember = useCallback(async (workspaceId, email, role = "member") => {
-    try {
-      const { data } = await api.post(`/workspaces/${workspaceId}/invite`, {
-        email,
-        role,
-      });
-      return { success: true, invite: data.invite };
-    } catch (err) {
-      return { success: false, message: err.response?.data?.message };
-    }
-  }, []);
-
-  const selectWorkspace = useCallback((workspace) => {
-    setActiveWorkspace(workspace);
-  }, []);
+  const current = workspaces.find((w) => w._id === currentId) || null;
 
   return (
     <WorkspaceContext.Provider
-      value={{
-        workspaces,
-        activeWorkspace,
-        loadingWorkspaces,
-        fetchWorkspaces,
-        createWorkspace,
-        updateWorkspace,
-        inviteMember,
-        selectWorkspace,
-        setWorkspaces,
-      }}
+      value={{ workspaces, current, currentId, loading, refresh, selectWorkspace, createWorkspace }}
     >
       {children}
     </WorkspaceContext.Provider>
   );
-};
+}
 
-export const useWorkspace = () => {
+export function useWorkspace() {
   const ctx = useContext(WorkspaceContext);
   if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");
   return ctx;
-};
-
-export default WorkspaceContext;
+}

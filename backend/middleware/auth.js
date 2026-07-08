@@ -2,6 +2,8 @@ const { verifyToken } = require("../utils/jwt");
 const User = require("../models/User");
 const Workspace = require("../models/Workspace");
 const Board = require("../models/Board");
+const List = require("../models/List");
+const Card = require("../models/Card");
 const { errorResponse } = require("../utils/response");
 
 // ─── Protect — require a valid JWT ───────────────────────────────────────────
@@ -100,4 +102,65 @@ const requireBoardAccess = async (req, res, next) => {
   }
 };
 
-module.exports = { protect, requireWorkspaceMember, requireWorkspaceAdmin, requireBoardAccess };
+const requireListAccess = async (req, res, next) => {
+  try {
+    const list = await List.findById(req.params.listId);
+    if (!list || list.isArchived) {
+      return errorResponse(res, "List not found.", 404);
+    }
+
+    const board = await Board.findById(list.board);
+    if (!board || board.isArchived) {
+      return errorResponse(res, "Board not found.", 404);
+    }
+
+    const isMember = board.members.some(
+      (m) => m.user.toString() === req.user._id.toString()
+    );
+    if (!isMember) {
+      return errorResponse(res, "Access denied. You are not a member of this board.", 403);
+    }
+
+    req.list = list;
+    req.board = board;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+const requireCardAccess = async (req, res, next) => {
+  try {
+    const card = await Card.findById(req.params.cardId);
+    if (!card || card.isArchived) {
+      return errorResponse(res, "Card not found.", 404);
+    }
+
+    const board = await Board.findById(card.board);
+    if (!board || board.isArchived) {
+      return errorResponse(res, "Board not found.", 404);
+    }
+
+    const isMember = board.members.some(
+      (m) => m.user.toString() === req.user._id.toString()
+    );
+    if (!isMember) {
+      return errorResponse(res, "Access denied. You are not a member of this board.", 403);
+    }
+
+    req.card = card;
+    req.board = board;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  protect,
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  requireBoardAccess,
+  requireListAccess,
+  requireCardAccess,
+};

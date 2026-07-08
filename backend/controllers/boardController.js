@@ -111,6 +111,11 @@ exports.updateBoard = async (req, res, next) => {
     allowed.forEach((k) => {
       if (req.body[k] !== undefined) updates[k] = req.body[k];
     });
+
+    if (Array.isArray(req.body.listOrder)) {
+      updates.listOrder = req.body.listOrder;
+    }
+
     updates.lastActivity = new Date();
 
     const board = await Board.findByIdAndUpdate(req.params.boardId, updates, {
@@ -119,6 +124,18 @@ exports.updateBoard = async (req, res, next) => {
     });
 
     if (!board) return errorResponse(res, "Board not found.", 404);
+
+    if (Array.isArray(req.body.lists)) {
+      await Promise.all(
+        req.body.lists.map(async (listUpdate) => {
+          if (!listUpdate._id) return;
+          await List.findByIdAndUpdate(listUpdate._id, {
+            cardOrder: listUpdate.cardOrder || [],
+          });
+        })
+      );
+    }
+
     return successResponse(res, { board }, "Board updated.");
   } catch (err) {
     next(err);

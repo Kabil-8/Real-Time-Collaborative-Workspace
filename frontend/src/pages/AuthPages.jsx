@@ -1,210 +1,103 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-const InputField = ({ label, type, value, onChange, placeholder, error }) => (
-  <div className="mb-5">
-    <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`w-full px-4 py-3 rounded-xl bg-slate-800/60 border text-white placeholder-slate-500
-        focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all
-        ${error ? "border-red-500" : "border-slate-700"}`}
-    />
-    {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
-  </div>
-);
-
-const getPasswordStrength = (password) => {
-  let score = 0;
-  if (password.length >= 6) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return score;
-};
-
-const AuthShell = ({ title, subtitle, children }) => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-    {/* Ambient glow */}
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-violet-600/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[300px] bg-indigo-600/8 rounded-full blur-3xl" />
-    </div>
-
-    <div className="relative w-full max-w-md">
-      {/* Logo mark */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2.5 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/30">
-            Z
-          </div>
-          <span className="text-white font-semibold text-xl tracking-tight">Zaalima</span>
+function AuthCard({ title, children }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow">
+        <div className="mb-6">
+          <div className="text-brand-700 text-2xl font-bold">Zaalima</div>
+          <h1 className="mt-2 text-xl font-semibold">{title}</h1>
         </div>
-        <h1 className="text-2xl font-bold text-white mb-1">{title}</h1>
-        <p className="text-slate-400 text-sm">{subtitle}</p>
-      </div>
-
-      <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
         {children}
       </div>
     </div>
-  </div>
-);
+  );
+}
 
-// ─── Login Page ───────────────────────────────────────────────────────────────
-export const LoginPage = () => {
+export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState({});
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [globalError, setGlobalError] = useState("");
 
-  const validate = () => {
-    const errs = {};
-    if (!form.email) errs.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = "Enter a valid email";
-    if (!form.password) errs.password = "Password is required";
-    return errs;
-  };
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-
-    setLoading(true);
-    setGlobalError("");
-    const result = await login(form);
-    setLoading(false);
-
-    if (result.success) {
-      navigate("/");
-    } else {
-      setGlobalError(result.message);
-    }
-  };
-
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-  const passwordStrength = getPasswordStrength(form.password);
-  const strengthLabel = ["Weak", "Weak", "Fair", "Good", "Strong"][passwordStrength];
+    setLoading(true); setError(null);
+    try { await login(form.email, form.password); navigate("/"); }
+    catch (err) { setError(err?.response?.data?.error?.message || "Login failed"); }
+    finally { setLoading(false); }
+  }
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to your workspace">
-      <form onSubmit={handleSubmit}>
-        {globalError && (
-          <div className="mb-5 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-            {globalError}
-          </div>
-        )}
-        <InputField label="Email" type="email" value={form.email} onChange={set("email")}
-          placeholder="you@company.com" error={errors.email} />
-        <InputField label="Password" type="password" value={form.password} onChange={set("password")}
-          placeholder="••••••••" error={errors.password} />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600
-            text-white font-semibold hover:from-violet-500 hover:to-indigo-500
-            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
-            shadow-lg shadow-violet-500/20 hover:shadow-violet-500/30"
-        >
+    <AuthCard title="Sign in">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+          <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <input type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        <button type="submit" disabled={loading} className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-400">
-        No account?{" "}
-        <Link to="/register" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
-          Create one
-        </Link>
+      <p className="mt-4 text-sm text-slate-600">
+        No account? <Link to="/register" className="text-brand-600 hover:text-brand-700">Create one</Link>
       </p>
-    </AuthShell>
+    </AuthCard>
   );
-};
+}
 
-// ─── Register Page ────────────────────────────────────────────────────────────
-export const RegisterPage = () => {
+export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [errors, setErrors] = useState({});
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [globalError, setGlobalError] = useState("");
 
-  const validate = () => {
-    const errs = {};
-    if (!form.name.trim()) errs.name = "Name is required";
-    if (!form.email) errs.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(form.email)) errs.email = "Enter a valid email";
-    if (!form.password) errs.password = "Password is required";
-    else if (form.password.length < 6) errs.password = "Minimum 6 characters";
-    return errs;
-  };
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-
-    setLoading(true);
-    setGlobalError("");
-    const result = await register(form);
-    setLoading(false);
-
-    if (result.success) navigate("/");
-    else setGlobalError(result.message);
-  };
-
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+    setLoading(true); setError(null);
+    try { await register(form.name, form.email, form.password); navigate("/"); }
+    catch (err) { setError(err?.response?.data?.error?.message || "Registration failed"); }
+    finally { setLoading(false); }
+  }
 
   return (
-    <AuthShell title="Create your account" subtitle="Start collaborating with your team today">
-      <form onSubmit={handleSubmit}>
-        {globalError && (
-          <div className="mb-5 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-            {globalError}
-          </div>
-        )}
-        <InputField label="Full name" type="text" value={form.name} onChange={set("name")}
-          placeholder="Alex Chen" error={errors.name} />
-        <InputField label="Email" type="email" value={form.email} onChange={set("email")}
-          placeholder="you@company.com" error={errors.email} />
-        <InputField label="Password" type="password" value={form.password} onChange={set("password")}
-          placeholder="Min. 6 characters" error={errors.password} />
-        <div className="mb-5">
-          <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-            <div
-              className="h-full bg-violet-500 transition-all"
-              style={{ width: `${Math.max(passwordStrength, 1) * 25}%` }}
-            />
-          </div>
-          <p className="mt-1.5 text-xs text-slate-500">Password strength: {strengthLabel}</p>
+    <AuthCard title="Create your account">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
+          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
         </div>
-        
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600
-            text-white font-semibold hover:from-violet-500 hover:to-indigo-500
-            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200
-            shadow-lg shadow-violet-500/20"
-        >
-          {loading ? "Creating account…" : "Create account"}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+          <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <input type="password" required minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
+          <p className="mt-1 text-xs text-slate-500">Minimum 8 characters</p>
+        </div>
+        {error && <div className="text-sm text-red-600">{error}</div>}
+        <button type="submit" disabled={loading} className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {loading ? "Creating…" : "Create account"}
         </button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-400">
-        Already have an account?{" "}
-        <Link to="/login" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
-          Sign in
-        </Link>
+      <p className="mt-4 text-sm text-slate-600">
+        Already have an account? <Link to="/login" className="text-brand-600 hover:text-brand-700">Sign in</Link>
       </p>
-    </AuthShell>
+    </AuthCard>
   );
-};
+}
