@@ -4,7 +4,6 @@ const Workspace = require("../models/Workspace");
 const Board = require("../models/Board");
 const { Role } = require("../models/Role");
 const { errorResponse } = require("../utils/response");
-
 // ─── Protect — require a valid JWT ───────────────────────────────────────────
 const protect = async (req, res, next) => {
   try {

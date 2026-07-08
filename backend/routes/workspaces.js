@@ -23,7 +23,6 @@ const {
 } = require("../middleware/auth");
 const { handleValidationErrors } = require("../middleware/validate");
 
-// All routes require authentication
 router.use(protect);
 
 router.post(
@@ -51,7 +50,6 @@ router.patch(
   updateWorkspace
 );
 router.delete("/:workspaceId", archiveWorkspace);
-
 router.post(
   "/:workspaceId/invite",
   requireWorkspaceMember,

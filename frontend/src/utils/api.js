@@ -6,7 +6,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Attach JWT from localStorage on every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("zaalima_token");
@@ -17,7 +16,6 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
-
 // Handle 401s globally — clear storage and redirect to login
 api.interceptors.response.use(
   (response) => response,

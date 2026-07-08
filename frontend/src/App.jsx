@@ -81,8 +81,8 @@ const ProtectedLayout = () => (
 const AppRoutes = () => (
   <Routes>
     {/* Public */}
-    <Route path="/login"           element={<PublicRoute><LoginPage /></PublicRoute>} />
-    <Route path="/register"        element={<PublicRoute><RegisterPage /></PublicRoute>} />
+    <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+    <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
     <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
     <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
     <Route path="/invite/:token" element={<InviteAcceptPage />} />

@@ -13,20 +13,20 @@ const sanitizeMiddleware = require("./middleware/sanitize");
 const createLogger = require("./utils/logger");
 const { initSocket } = require("./socketHandler");
 
-const authRoutes         = require("./routes/auth");
-const workspaceRoutes    = require("./routes/workspaces");
-const boardRoutes        = require("./routes/boards");
-const listRoutes         = require("./routes/lists");
-const cardRoutes         = require("./routes/cards");
-const adminRoutes        = require("./routes/admin");
-const searchRoutes       = require("./routes/search");
+const authRoutes = require("./routes/auth");
+const workspaceRoutes = require("./routes/workspaces");
+const boardRoutes = require("./routes/boards");
+const listRoutes = require("./routes/lists");
+const cardRoutes = require("./routes/cards");
+const adminRoutes = require("./routes/admin");
+const searchRoutes = require("./routes/search");
 const notificationRoutes = require("./routes/notifications");
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 const app = express();
 const httpServer = http.createServer(app);
 
-// Socket.io
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
@@ -47,12 +47,12 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'"],
-        styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", "data:", "blob:"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
         connectSrc: ["'self'", process.env.CLIENT_ORIGIN || "http://localhost:3000"],
-        fontSrc:    ["'self'", "https://fonts.gstatic.com"],
-        objectSrc:  ["'none'"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
         upgradeInsecureRequests: [],
       },
     },
@@ -99,17 +99,17 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth",          authRoutes);
-app.use("/api/workspaces",    workspaceRoutes);
-app.use("/api/boards",        boardRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/workspaces", workspaceRoutes);
+app.use("/api/boards", boardRoutes);
 // Lists: /api/boards/:boardId/lists
 app.use("/api/boards/:boardId/lists", listRoutes);
 // Cards (board-level move + list-scoped CRUD): /api/boards/:boardId/cards/...
 app.use("/api/boards/:boardId/cards", cardRoutes);
 // Admin: /api/admin (system-level role management)
-app.use("/api/admin",         adminRoutes);
+app.use("/api/admin", adminRoutes);
 // Search: /api/search?q=...
-app.use("/api/search",        searchRoutes);
+app.use("/api/search", searchRoutes);
 // Notifications: /api/notifications
 app.use("/api/notifications", notificationRoutes);
 

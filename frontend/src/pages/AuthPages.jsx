@@ -130,18 +130,6 @@ const AuthShell = ({ title, subtitle, children }) => (
   </div>
 );
 
-// ─── Social Button Component ────────────────────────────────────────────
-const SocialButton = ({ icon, label }) => (
-  <button className="w-full py-3 px-4 rounded-xl bg-white/5 backdrop-blur-sm 
-    border border-cyan-400/15 text-white font-medium
-    hover:bg-white/10 hover:border-cyan-400/30 
-    transition-all duration-300 group flex items-center justify-center gap-3
-    hover:shadow-lg hover:shadow-cyan-400/10">
-    <span className="text-lg group-hover:scale-110 transition-transform duration-300">{icon}</span>
-    <span className="text-sm">Continue with {label}</span>
-  </button>
-);
-
 // ─── Login Page ──────────────────────────────────────────────────────────
 export const LoginPage = () => {
   const { login } = useAuth();
@@ -191,8 +179,6 @@ export const LoginPage = () => {
             {globalError}
           </div>
         )}
-
-
 
         <InputField label="Email" type="email" value={form.email}
           onChange={set("email")} placeholder="you@company.com" error={errors.email} />
@@ -248,8 +234,11 @@ export const LoginPage = () => {
 
       <p className="mt-6 text-center text-sm text-cyan-200/50">
         No account?{" "}
-        <Link to={`/register${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="text-cyan-400 hover:text-cyan-300 font-medium 
-          transition-colors hover:underline underline-offset-2">
+        <Link
+          to={`/register${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+          className="text-cyan-400 hover:text-cyan-300 font-medium 
+            transition-colors hover:underline underline-offset-2"
+        >
           Create one
         </Link>
       </p>
@@ -342,8 +331,11 @@ export const RegisterPage = () => {
 
       <p className="mt-6 text-center text-sm text-cyan-200/50">
         Already have an account?{" "}
-        <Link to={`/login${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="text-cyan-400 hover:text-cyan-300 font-medium 
-          transition-colors hover:underline underline-offset-2">
+        <Link
+          to={`/login${redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""}`}
+          className="text-cyan-400 hover:text-cyan-300 font-medium 
+            transition-colors hover:underline underline-offset-2"
+        >
           Sign in
         </Link>
       </p>
@@ -646,4 +638,4 @@ export const ResetPasswordPage = () => {
       </form>
     </AuthShell>
   );
-};
+};
