@@ -1,57 +1,53 @@
 const express = require("express");
-const router = express.Router();
-const {
-  createWorkspace,
-  getMyWorkspaces,
-  getWorkspace,
-  updateWorkspace,
-  archiveWorkspace,
-  inviteMember,
-  acceptInvite,
-  removeMember,
-  getWorkspaceBoards,
-  createWorkspaceValidation,
-  inviteMemberValidation,
-} = require("../controllers/workspaceController");
+const { body } = require("express-validator");
+const validate = require("../middleware/validate");
 const {
   protect,
   requireWorkspaceMember,
   requireWorkspaceAdmin,
 } = require("../middleware/auth");
-const { handleValidationErrors } = require("../middleware/validate");
+const ctrl = require("../controllers/workspaceController");
 
+const router = express.Router();
 router.use(protect);
 
 router.post(
   "/",
-  createWorkspaceValidation,
-  handleValidationErrors,
-  createWorkspace
+  [body("name").isString().trim().isLength({ min: 1, max: 80 })],
+  validate,
+  ctrl.createWorkspace
 );
-router.get("/", getMyWorkspaces);
 
-// Accept invite (needs auth but not workspace membership yet)
-router.post("/accept-invite/:token", acceptInvite);
-
-router.get("/:workspaceId", getWorkspace);
-router.get("/:workspaceId/boards", requireWorkspaceMember, getWorkspaceBoards);
-
-router.patch(
-  "/:workspaceId",
-  requireWorkspaceAdmin,
-  handleValidationErrors,
-  updateWorkspace
-);
-router.delete("/:workspaceId", archiveWorkspace);
+router.get("/", ctrl.listMyWorkspaces);
 
 router.post(
-  "/:workspaceId/invite",
-  requireWorkspaceAdmin,
-  inviteMemberValidation,
-  handleValidationErrors,
-  inviteMember
+  "/accept-invite",
+  [body("token").isString().isLength({ min: 10 })],
+  validate,
+  ctrl.acceptInvite
 );
 
-router.delete("/:workspaceId/members/:userId", requireWorkspaceMember, removeMember);
+router.get("/:id", requireWorkspaceMember, ctrl.getWorkspace);
+
+router.patch(
+  "/:id",
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  [body("name").optional().isString().trim().isLength({ min: 1, max: 80 })],
+  validate,
+  ctrl.updateWorkspace
+);
+
+router.post(
+  "/:id/invite",
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  [
+    body("email").isEmail().normalizeEmail(),
+    body("role").optional().isIn(["admin", "member"]),
+  ],
+  validate,
+  ctrl.inviteMember
+);
 
 module.exports = router;

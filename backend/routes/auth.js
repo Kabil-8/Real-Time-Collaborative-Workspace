@@ -1,24 +1,43 @@
 const express = require("express");
-const router = express.Router();
-const {
-  register,
-  login,
-  getMe,
-  updateMe,
-  changePassword,
-  registerValidation,
-  loginValidation,
-} = require("../controllers/authController");
+const { body } = require("express-validator");
+const validate = require("../middleware/validate");
 const { protect } = require("../middleware/auth");
-const { handleValidationErrors } = require("../middleware/validate");
+const ctrl = require("../controllers/authController");
 
-// Public
-router.post("/register", registerValidation, handleValidationErrors, register);
-router.post("/login", loginValidation, handleValidationErrors, login);
+const router = express.Router();
 
-// Protected
-router.get("/me", protect, getMe);
-router.patch("/me", protect, updateMe);
-router.post("/change-password", protect, changePassword);
+router.post(
+  "/register",
+  [
+    body("name").isString().trim().isLength({ min: 1, max: 80 }),
+    body("email").isEmail().normalizeEmail(),
+    body("password").isString().isLength({ min: 8, max: 200 }),
+  ],
+  validate,
+  ctrl.register
+);
+
+router.post(
+  "/login",
+  [
+    body("email").isEmail().normalizeEmail(),
+    body("password").isString().isLength({ min: 1 }),
+  ],
+  validate,
+  ctrl.login
+);
+
+router.get("/me", protect, ctrl.me);
+
+router.patch(
+  "/profile",
+  protect,
+  [
+    body("name").optional().isString().trim().isLength({ min: 1, max: 80 }),
+    body("avatarUrl").optional().isString(),
+  ],
+  validate,
+  ctrl.updateProfile
+);
 
 module.exports = router;

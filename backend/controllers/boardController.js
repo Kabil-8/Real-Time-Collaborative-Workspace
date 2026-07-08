@@ -1,155 +1,240 @@
-const { body } = require("express-validator");
 const Board = require("../models/Board");
 const List = require("../models/List");
 const Card = require("../models/Card");
+const Workspace = require("../models/Workspace");
 const { successResponse, errorResponse } = require("../utils/response");
+const { orderBetween, needsRebalance, ORDER_STEP } = require("../utils/order");
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+async function assertBoardAccess(userId, boardId) {
+  const board = await Board.findById(boardId).lean();
+  if (!board) return { error: { status: 404, message: "Board not found" } };
+  const ws = await Workspace.findById(board.workspaceId).lean();
+  if (!ws) return { error: { status: 404, message: "Workspace not found" } };
+  const isMember = ws.members.some((m) => String(m.userId) === String(userId));
+  if (!isMember) return { error: { status: 403, message: "Not a workspace member" } };
+  return { board };
+}
 
-exports.createBoardValidation = [
-  body("title")
-    .trim()
-    .notEmpty().withMessage("Board title is required")
-    .isLength({ max: 100 }).withMessage("Title must be 100 characters or fewer"),
-  body("workspaceId").notEmpty().withMessage("workspaceId is required"),
-];
-
-// ─── Controllers ──────────────────────────────────────────────────────────────
-
-/**
- * POST /api/boards
- */
-exports.createBoard = async (req, res, next) => {
+async function createBoard(req, res, next) {
   try {
-    const { title, description, workspaceId, background } = req.body;
-
+    const { name, description = "" } = req.body;
     const board = await Board.create({
+      workspaceId: req.workspace._id,
+      name,
+      description,
+      createdBy: req.userId,
+    });
+    return successResponse(res, { board }, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listBoardsForWorkspace(req, res, next) {
+  try {
+    const boards = await Board.find({ workspaceId: req.workspace._id })
+      .sort({ createdAt: -1 })
+      .lean();
+    return successResponse(res, { boards });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getBoardFull(req, res, next) {
+  try {
+    const { board, error } = await assertBoardAccess(req.userId, req.params.id);
+    if (error) return errorResponse(res, error.message, error.status);
+    const [lists, cards] = await Promise.all([
+      List.find({ boardId: board._id }).sort({ order: 1 }).lean(),
+      Card.find({ boardId: board._id }).sort({ order: 1 }).lean(),
+    ]);
+    return successResponse(res, { board, lists, cards });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateBoard(req, res, next) {
+  try {
+    const { board, error } = await assertBoardAccess(req.userId, req.params.id);
+    if (error) return errorResponse(res, error.message, error.status);
+    const { name, description } = req.body;
+    const patch = {};
+    if (name !== undefined) patch.name = name;
+    if (description !== undefined) patch.description = description;
+    const updated = await Board.findByIdAndUpdate(board._id, patch, { new: true });
+    return successResponse(res, { board: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteBoard(req, res, next) {
+  try {
+    const { board, error } = await assertBoardAccess(req.userId, req.params.id);
+    if (error) return errorResponse(res, error.message, error.status);
+    await Promise.all([
+      Board.deleteOne({ _id: board._id }),
+      List.deleteMany({ boardId: board._id }),
+      Card.deleteMany({ boardId: board._id }),
+    ]);
+    return successResponse(res, { ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Lists
+async function createList(req, res, next) {
+  try {
+    const { boardId, title } = req.body;
+    const { error } = await assertBoardAccess(req.userId, boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    const last = await List.findOne({ boardId }).sort({ order: -1 }).lean();
+    const order = orderBetween(last ? last.order : null, null);
+    const list = await List.create({ boardId, title, order });
+    return successResponse(res, { list }, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateList(req, res, next) {
+  try {
+    const list = await List.findById(req.params.listId);
+    if (!list) return errorResponse(res, "List not found", 404);
+    const { error } = await assertBoardAccess(req.userId, list.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    const { title, order } = req.body;
+    if (title !== undefined) list.title = title;
+    if (order !== undefined) list.order = order;
+    await list.save();
+    return successResponse(res, { list });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteList(req, res, next) {
+  try {
+    const list = await List.findById(req.params.listId);
+    if (!list) return errorResponse(res, "List not found", 404);
+    const { error } = await assertBoardAccess(req.userId, list.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    await Promise.all([
+      List.deleteOne({ _id: list._id }),
+      Card.deleteMany({ listId: list._id }),
+    ]);
+    return successResponse(res, { ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Cards
+async function createCard(req, res, next) {
+  try {
+    const { listId, title, description = "" } = req.body;
+    const list = await List.findById(listId).lean();
+    if (!list) return errorResponse(res, "List not found", 404);
+    const { error } = await assertBoardAccess(req.userId, list.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    const last = await Card.findOne({ listId }).sort({ order: -1 }).lean();
+    const order = orderBetween(last ? last.order : null, null);
+    const card = await Card.create({
+      boardId: list.boardId,
+      listId,
       title,
-      description: description || "",
-      workspace: workspaceId,
-      createdBy: req.user._id,
-      members: [{ user: req.user._id, role: "admin" }],
-      background: background || {
-        type: "gradient",
-        value: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      },
+      description,
+      order,
+      createdBy: req.userId,
     });
-
-    // Seed 3 default lists
-    const defaultLists = ["To Do", "In Progress", "Done"];
-    const listDocs = await Promise.all(
-      defaultLists.map((listTitle, idx) =>
-        List.create({
-          title: listTitle,
-          board: board._id,
-          workspace: workspaceId,
-          createdBy: req.user._id,
-          position: idx,
-        })
-      )
-    );
-
-    board.listOrder = listDocs.map((l) => l._id);
-    await board.save();
-
-    return successResponse(res, { board }, "Board created.", 201);
+    return successResponse(res, { card }, 201);
   } catch (err) {
     next(err);
   }
-};
+}
 
-/**
- * GET /api/boards/:boardId
- * Full board hydration: board + lists + cards
- */
-exports.getBoard = async (req, res, next) => {
+async function updateCard(req, res, next) {
   try {
-    const board = await Board.findById(req.params.boardId)
-      .populate("createdBy", "name avatar avatarColor")
-      .populate("members.user", "name email avatar avatarColor");
-
-    if (!board || board.isArchived) {
-      return errorResponse(res, "Board not found.", 404);
+    const card = await Card.findById(req.params.cardId);
+    if (!card) return errorResponse(res, "Card not found", 404);
+    const { error } = await assertBoardAccess(req.userId, card.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    const allowed = ["title", "description", "labels", "dueDate", "assigneeIds"];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) card[key] = req.body[key];
     }
-
-    // Fetch all lists for this board in position order
-    const lists = await List.find({ board: board._id, isArchived: false })
-      .sort({ position: 1 });
-
-    // Fetch all cards for this board in position order
-    const cards = await Card.find({ board: board._id, isArchived: false })
-      .populate("assignees", "name avatar avatarColor")
-      .populate("createdBy", "name avatar avatarColor")
-      .sort({ position: 1 });
-
-    // Group cards by list
-    const cardsByList = {};
-    cards.forEach((card) => {
-      const listId = card.list.toString();
-      if (!cardsByList[listId]) cardsByList[listId] = [];
-      cardsByList[listId].push(card);
-    });
-
-    const listsWithCards = lists.map((list) => ({
-      ...list.toObject(),
-      cards: cardsByList[list._id.toString()] || [],
-    }));
-
-    return successResponse(res, { board, lists: listsWithCards });
+    await card.save();
+    return successResponse(res, { card });
   } catch (err) {
     next(err);
   }
-};
+}
 
-/**
- * PATCH /api/boards/:boardId
- */
-exports.updateBoard = async (req, res, next) => {
+async function deleteCard(req, res, next) {
   try {
-    const allowed = ["title", "description", "background", "isStarred"];
-    const updates = {};
-    allowed.forEach((k) => {
-      if (req.body[k] !== undefined) updates[k] = req.body[k];
-    });
-
-    if (Array.isArray(req.body.listOrder)) {
-      updates.listOrder = req.body.listOrder;
-    }
-
-    updates.lastActivity = new Date();
-
-    const board = await Board.findByIdAndUpdate(req.params.boardId, updates, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!board) return errorResponse(res, "Board not found.", 404);
-
-    if (Array.isArray(req.body.lists)) {
-      await Promise.all(
-        req.body.lists.map(async (listUpdate) => {
-          if (!listUpdate._id) return;
-          await List.findByIdAndUpdate(listUpdate._id, {
-            cardOrder: listUpdate.cardOrder || [],
-          });
-        })
-      );
-    }
-
-    return successResponse(res, { board }, "Board updated.");
+    const card = await Card.findById(req.params.cardId);
+    if (!card) return errorResponse(res, "Card not found", 404);
+    const { error } = await assertBoardAccess(req.userId, card.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    await Card.deleteOne({ _id: card._id });
+    return successResponse(res, { ok: true });
   } catch (err) {
     next(err);
   }
-};
+}
 
-/**
- * DELETE /api/boards/:boardId — archive
- */
-exports.archiveBoard = async (req, res, next) => {
+async function moveCard(req, res, next) {
   try {
-    await Board.findByIdAndUpdate(req.params.boardId, { isArchived: true });
-    return successResponse(res, {}, "Board archived.");
+    const card = await Card.findById(req.params.cardId);
+    if (!card) return errorResponse(res, "Card not found", 404);
+    const { error } = await assertBoardAccess(req.userId, card.boardId);
+    if (error) return errorResponse(res, error.message, error.status);
+    const { targetListId, newIndex } = req.body;
+    const targetList = await List.findById(targetListId).lean();
+    if (!targetList) return errorResponse(res, "Target list not found", 404);
+    if (String(targetList.boardId) !== String(card.boardId)) {
+      return errorResponse(res, "Cannot move card across boards", 400);
+    }
+    const siblings = await Card.find({
+      listId: targetListId,
+      _id: { $ne: card._id },
+    })
+      .sort({ order: 1 })
+      .select({ _id: 1, order: 1 })
+      .lean();
+    const idx = Math.max(0, Math.min(newIndex, siblings.length));
+    const prev = idx > 0 ? siblings[idx - 1].order : null;
+    const next = idx < siblings.length ? siblings[idx].order : null;
+    card.listId = targetList._id;
+    card.order = orderBetween(prev, next);
+    await card.save();
+    if (needsRebalance(prev, next)) {
+      const all = await Card.find({ listId: targetListId }).sort({ order: 1 });
+      for (let i = 0; i < all.length; i++) {
+        all[i].order = (i + 1) * ORDER_STEP;
+        await all[i].save();
+      }
+    }
+    return successResponse(res, { card });
   } catch (err) {
     next(err);
   }
+}
+
+module.exports = {
+  createBoard,
+  listBoardsForWorkspace,
+  getBoardFull,
+  updateBoard,
+  deleteBoard,
+  createList,
+  updateList,
+  deleteList,
+  createCard,
+  updateCard,
+  deleteCard,
+  moveCard,
 };

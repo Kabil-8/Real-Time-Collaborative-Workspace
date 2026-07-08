@@ -1,121 +1,69 @@
 require("dotenv").config();
 const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const helmet = require("helmet");
 const cors = require("cors");
+const http = require("http");
 const rateLimit = require("express-rate-limit");
+const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
-const errorHandler = require("./middleware/errorHandler");
+const { errorHandler, notFound } = require("./middleware/errorHandler");
 
 const authRoutes = require("./routes/auth");
 const workspaceRoutes = require("./routes/workspaces");
 const boardRoutes = require("./routes/boards");
-const listRoutes = require("./routes/lists");
-const cardRoutes = require("./routes/cards");
 
-// ─── App setup ────────────────────────────────────────────────────────────────
-const app = express();
-const httpServer = http.createServer(app);
+async function start() {
+  await connectDB();
 
-// Socket.io — wired up now, room logic comes in Week 3
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+  const app = express();
+  const server = http.createServer(app);
 
-// Attach io to app so controllers can emit events (Week 3+)
-app.set("io", io);
-
-// ─── Security & Parsing ───────────────────────────────────────────────────────
-app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
-    credentials: true,
-  })
-);
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting — global
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
-  message: { success: false, message: "Too many requests, please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api", limiter);
-
-// Stricter limit on auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: "Too many auth attempts. Try again in 15 minutes." },
-});
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-
-// ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth", authRoutes);
-app.use("/api/workspaces", workspaceRoutes);
-app.use("/api/boards", boardRoutes);
-app.use("/api/lists", listRoutes);
-app.use("/api/cards", cardRoutes);
-
-// Health check
-app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "Zaalima Workspace API is running",
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  });
-});
-
-// 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({ success: false, message: "Route not found." });
-});
-
-// Global error handler (must be last)
-app.use(errorHandler);
-
-// ─── Socket.io — Week 1 scaffolding ──────────────────────────────────────────
-// Full room/event logic implemented in Week 3
-io.on("connection", (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
-
-  // Client joins a board room — used in Week 3 for real-time sync
-  socket.on("join_board", ({ boardId }) => {
-    socket.join(`board:${boardId}`);
-    console.log(`  └─ Socket ${socket.id} joined board:${boardId}`);
+  const io = new Server(server, {
+    cors: {
+      origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+      credentials: true,
+    },
   });
 
-  socket.on("leave_board", ({ boardId }) => {
-    socket.leave(`board:${boardId}`);
+  app.set("io", io);
+
+  app.use(
+    cors({
+      origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+      credentials: true,
+    })
+  );
+  app.use(express.json({ limit: "1mb" }));
+
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use("/api", apiLimiter);
+
+  app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+  app.use("/api/auth", authRoutes);
+  app.use("/api/workspaces", workspaceRoutes);
+  app.use("/api/boards", boardRoutes);
+
+  app.use(notFound);
+  app.use(errorHandler);
+
+  io.on("connection", (socket) => {
+    socket.on("join-board", (boardId) => socket.join(`board:${boardId}`));
+    socket.on("leave-board", (boardId) => socket.leave(`board:${boardId}`));
   });
 
-  socket.on("disconnect", (reason) => {
-    console.log(`🔌 Socket disconnected: ${socket.id} (${reason})`);
+  const port = Number(process.env.PORT) || 4000;
+  server.listen(port, () => {
+    console.log(`[api] listening on http://localhost:${port}`);
   });
+}
+
+start().catch((err) => {
+  console.error("[fatal]", err);
+  process.exit(1);
 });
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
-
-connectDB().then(() => {
-  httpServer.listen(PORT, () => {
-    console.log(`\n🚀 Zaalima Workspace API`);
-    console.log(`   Server  : http://localhost:${PORT}`);
-    console.log(`   Health  : http://localhost:${PORT}/api/health`);
-    console.log(`   Env     : ${process.env.NODE_ENV || "development"}\n`);
-  });
-});
-
-module.exports = { app, io };

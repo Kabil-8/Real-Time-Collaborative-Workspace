@@ -1,20 +1,67 @@
 const express = require("express");
-const router = express.Router();
-const {
-  createBoard,
-  getBoard,
-  updateBoard,
-  archiveBoard,
-  createBoardValidation,
-} = require("../controllers/boardController");
-const { protect, requireBoardAccess } = require("../middleware/auth");
-const { handleValidationErrors } = require("../middleware/validate");
+const { body } = require("express-validator");
+const validate = require("../middleware/validate");
+const { protect, requireWorkspaceMember } = require("../middleware/auth");
+const ctrl = require("../controllers/boardController");
 
+const router = express.Router();
 router.use(protect);
 
-router.post("/", createBoardValidation, handleValidationErrors, createBoard);
-router.get("/:boardId", requireBoardAccess, getBoard);
-router.patch("/:boardId", requireBoardAccess, updateBoard);
-router.delete("/:boardId", requireBoardAccess, archiveBoard);
+// Boards
+router.post(
+  "/workspace/:workspaceId",
+  requireWorkspaceMember,
+  [
+    body("name").isString().trim().isLength({ min: 1, max: 120 }),
+    body("description").optional().isString().isLength({ max: 500 }),
+  ],
+  validate,
+  ctrl.createBoard
+);
+
+router.get(
+  "/workspace/:workspaceId",
+  requireWorkspaceMember,
+  ctrl.listBoardsForWorkspace
+);
+
+router.get("/:id/full", ctrl.getBoardFull);
+router.patch("/:id", ctrl.updateBoard);
+router.delete("/:id", ctrl.deleteBoard);
+
+// Lists
+router.post(
+  "/lists",
+  [
+    body("boardId").isString().notEmpty(),
+    body("title").isString().trim().isLength({ min: 1, max: 120 }),
+  ],
+  validate,
+  ctrl.createList
+);
+router.patch("/lists/:listId", ctrl.updateList);
+router.delete("/lists/:listId", ctrl.deleteList);
+
+// Cards
+router.post(
+  "/cards",
+  [
+    body("listId").isString().notEmpty(),
+    body("title").isString().trim().isLength({ min: 1, max: 240 }),
+  ],
+  validate,
+  ctrl.createCard
+);
+router.patch("/cards/:cardId", ctrl.updateCard);
+router.delete("/cards/:cardId", ctrl.deleteCard);
+router.patch(
+  "/cards/:cardId/move",
+  [
+    body("targetListId").isString().notEmpty(),
+    body("newIndex").isInt({ min: 0 }),
+  ],
+  validate,
+  ctrl.moveCard
+);
 
 module.exports = router;
