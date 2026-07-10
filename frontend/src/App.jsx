@@ -5,6 +5,8 @@ import AppShell from "./components/layout/AppShell";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import HomePage from "./pages/HomePage";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
+import BoardPage from "./pages/BoardPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -27,7 +29,9 @@ export default function App() {
       <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
       <Route path="/register" element={<RedirectIfAuthed><RegisterPage /></RedirectIfAuthed>} />
       <Route path="/" element={<RequireAuth><AppShell><HomePage /></AppShell></RequireAuth>} />
+      <Route path="/board/:boardId" element={<RequireAuth><AppShell><BoardPage /></AppShell></RequireAuth>} />
       <Route path="/workspace/settings" element={<RequireAuth><AppShell><WorkspaceSettings /></AppShell></RequireAuth>} />
+      <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
