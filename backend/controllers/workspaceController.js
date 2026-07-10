@@ -105,6 +105,62 @@ async function acceptInvite(req, res, next) {
   }
 }
 
+async function listInvites(req, res, next) {
+  try {
+    const ws = req.workspace;
+    return successResponse(res, { invites: ws.invites || [] });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function revokeInvite(req, res, next) {
+  try {
+    await Workspace.findByIdAndUpdate(req.params.id, {
+      $pull: { invites: { token: req.params.token } },
+    });
+    return successResponse(res, { ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateMemberRole(req, res, next) {
+  try {
+    const { role } = req.body;
+    const ws = await Workspace.findById(req.params.id);
+    if (!ws) return errorResponse(res, "Workspace not found", 404);
+    const target = ws.members.find((m) => String(m.userId) === String(req.params.userId));
+    if (!target) return errorResponse(res, "Member not found", 404);
+    if (target.role === "owner") return errorResponse(res, "Cannot change the owner's role", 400);
+    if (role === "owner") return errorResponse(res, "Cannot assign owner role", 400);
+    target.role = role;
+    await ws.save();
+    return successResponse(res, { member: target });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function removeMember(req, res, next) {
+  try {
+    const ws = await Workspace.findById(req.params.id);
+    if (!ws) return errorResponse(res, "Workspace not found", 404);
+    const targetId = String(req.params.userId);
+    const target = ws.members.find((m) => String(m.userId) === targetId);
+    if (!target) return errorResponse(res, "Member not found", 404);
+    if (target.role === "owner") return errorResponse(res, "Owner cannot be removed", 400);
+    const isSelf = targetId === String(req.userId);
+    const isAdmin = req.workspaceRole === "owner" || req.workspaceRole === "admin";
+    if (!isSelf && !isAdmin) return errorResponse(res, "Admin privileges required", 403);
+    ws.members = ws.members.filter((m) => String(m.userId) !== targetId);
+    await ws.save();
+    return successResponse(res, { ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createWorkspace,
   listMyWorkspaces,
@@ -112,4 +168,8 @@ module.exports = {
   updateWorkspace,
   inviteMember,
   acceptInvite,
+  listInvites,
+  revokeInvite,
+  updateMemberRole,
+  removeMember,
 };
