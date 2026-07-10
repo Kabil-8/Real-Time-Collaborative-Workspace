@@ -50,4 +50,33 @@ router.post(
   ctrl.inviteMember
 );
 
+router.get(
+  "/:id/invites",
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  ctrl.listInvites
+);
+
+router.delete(
+  "/:id/invites/:token",
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  ctrl.revokeInvite
+);
+
+router.patch(
+  "/:id/members/:userId",
+  requireWorkspaceMember,
+  requireWorkspaceAdmin,
+  [body("role").isIn(["admin", "member"])],
+  validate,
+  ctrl.updateMemberRole
+);
+
+router.delete(
+  "/:id/members/:userId",
+  requireWorkspaceMember,
+  ctrl.removeMember
+);
+
 module.exports = router;
