@@ -17,6 +17,10 @@ Full-stack collaborative workspace app.
 
 Runs on http://localhost:4000.
 
+To send workspace invitations, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+`SMTP_PASS`, and `SMTP_FROM` in `backend/.env`. For Gmail, use an App Password
+rather than your normal account password.
+
 ## Frontend
 
     cd frontend
