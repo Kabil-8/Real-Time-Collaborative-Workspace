@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api from "../utils/api";
+import { resetSocket } from "../utils/socket";
 
 const AuthContext = createContext(null);
 
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     setUser(null);
+    resetSocket();
   }, []);
 
   const updateUser = useCallback(async (patch) => {
