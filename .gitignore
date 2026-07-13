@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+frontend/build
 dist-ssr
 .output
 .vinxi
