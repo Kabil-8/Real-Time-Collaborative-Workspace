@@ -7,6 +7,9 @@ const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 const { errorHandler, notFound } = require("./middleware/errorHandler");
+const { verifyToken } = require("./utils/jwt");
+const Board = require("./models/Board");
+const Workspace = require("./models/Workspace");
 
 const authRoutes = require("./routes/auth");
 const workspaceRoutes = require("./routes/workspaces");
@@ -53,7 +56,27 @@ async function start() {
   app.use(errorHandler);
 
   io.on("connection", (socket) => {
-    socket.on("join-board", (boardId) => socket.join(`board:${boardId}`));
+    let userId = null;
+    try {
+      const token = socket.handshake.auth?.token;
+      if (token) userId = verifyToken(token).sub;
+    } catch {
+      /* unauthenticated sockets can still connect but cannot join rooms */
+    }
+
+    socket.on("join-board", async (boardId) => {
+      if (!userId || !boardId) return;
+      try {
+        const board = await Board.findById(boardId).lean();
+        if (!board) return;
+        const ws = await Workspace.findById(board.workspaceId).lean();
+        if (!ws) return;
+        const isMember = ws.members.some((m) => String(m.userId) === String(userId));
+        if (isMember) socket.join(`board:${boardId}`);
+      } catch {
+        /* ignore */
+      }
+    });
     socket.on("leave-board", (boardId) => socket.leave(`board:${boardId}`));
   });
 
