@@ -41,6 +41,12 @@ router.post(
 );
 router.patch("/lists/:listId", ctrl.updateList);
 router.delete("/lists/:listId", ctrl.deleteList);
+router.patch(
+  "/lists/:listId/reorder",
+  [body("newIndex").isInt({ min: 0 })],
+  validate,
+  ctrl.moveList
+);
 
 // Cards
 router.post(
@@ -54,6 +60,13 @@ router.post(
 );
 router.patch("/cards/:cardId", ctrl.updateCard);
 router.delete("/cards/:cardId", ctrl.deleteCard);
+router.get("/cards/:cardId/comments", ctrl.getCardComments);
+router.post(
+  "/cards/:cardId/comments",
+  [body("body").isString().trim().isLength({ min: 1, max: 2000 })],
+  validate,
+  ctrl.createComment
+);
 router.patch(
   "/cards/:cardId/move",
   [

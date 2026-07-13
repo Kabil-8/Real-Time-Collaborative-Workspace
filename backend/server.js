@@ -14,6 +14,7 @@ const Workspace = require("./models/Workspace");
 const authRoutes = require("./routes/auth");
 const workspaceRoutes = require("./routes/workspaces");
 const boardRoutes = require("./routes/boards");
+const notificationRoutes = require("./routes/notifications");
 
 async function start() {
   await connectDB();
@@ -51,6 +52,7 @@ async function start() {
   app.use("/api/auth", authRoutes);
   app.use("/api/workspaces", workspaceRoutes);
   app.use("/api/boards", boardRoutes);
+  app.use("/api/notifications", notificationRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
@@ -78,6 +80,24 @@ async function start() {
       }
     });
     socket.on("leave-board", (boardId) => socket.leave(`board:${boardId}`));
+
+    socket.on("card:typing", async ({ boardId, cardId, isTyping }) => {
+      if (!userId || !boardId || !cardId) return;
+      try {
+        const board = await Board.findById(boardId).lean();
+        if (!board) return;
+        const workspace = await Workspace.findById(board.workspaceId).lean();
+        const isMember = workspace?.members.some((member) => String(member.userId) === String(userId));
+        if (!isMember) return;
+        socket.to(`board:${boardId}`).emit("card:typing", {
+          cardId: String(cardId),
+          userId: String(userId),
+          isTyping: Boolean(isTyping),
+        });
+      } catch {
+        // Typing indicators are ephemeral; safely ignore transient failures.
+      }
+    });
   });
 
   const port = Number(process.env.PORT) || 4000;

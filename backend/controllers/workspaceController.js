@@ -1,7 +1,10 @@
 const crypto = require("crypto");
 const Workspace = require("../models/Workspace");
 const User = require("../models/User");
+const Board = require("../models/Board");
+const Card = require("../models/Card");
 const { successResponse, errorResponse } = require("../utils/response");
+const { sendWorkspaceInvite } = require("../utils/mailer");
 
 function slugify(name) {
   const base =
@@ -11,6 +14,10 @@ function slugify(name) {
       .replace(/(^-|-$)/g, "")
       .slice(0, 40) || "workspace";
   return `${base}-${crypto.randomBytes(3).toString("hex")}`;
+}
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function createWorkspace(req, res, next) {
@@ -60,6 +67,27 @@ async function getWorkspace(req, res, next) {
   }
 }
 
+async function searchWorkspace(req, res, next) {
+  try {
+    const query = req.query.q.trim();
+    if (query.length < 2) return successResponse(res, { boards: [], cards: [] });
+    const match = new RegExp(escapeRegex(query), "i");
+    const [boards, cards] = await Promise.all([
+      Board.find({ workspaceId: req.workspace._id, $or: [{ name: match }, { description: match }] })
+        .select("name description")
+        .limit(10)
+        .lean(),
+      Card.find({ $or: [{ title: match }, { description: match }], boardId: { $in: await Board.find({ workspaceId: req.workspace._id }).distinct("_id") } })
+        .select("title description boardId listId dueDate")
+        .limit(20)
+        .lean(),
+    ]);
+    return successResponse(res, { boards, cards });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateWorkspace(req, res, next) {
   try {
     const { name } = req.body;
@@ -77,11 +105,26 @@ async function updateWorkspace(req, res, next) {
 async function inviteMember(req, res, next) {
   try {
     const { email, role = "member" } = req.body;
+    const workspace = req.workspace;
+    const existingUser = await User.findOne({ email }).select({ _id: 1 }).lean();
+    if (existingUser && workspace.members.some((member) => String(member.userId) === String(existingUser._id))) {
+      return errorResponse(res, "This person is already a workspace member", 409);
+    }
+    if (workspace.invites.some((invite) => invite.email === email)) {
+      return errorResponse(res, "An invitation has already been sent to this email address", 409);
+    }
+
     const token = crypto.randomBytes(24).toString("hex");
+    await sendWorkspaceInvite({
+      email,
+      workspaceName: workspace.name,
+      role,
+      token,
+    });
     await Workspace.findByIdAndUpdate(req.params.id, {
       $push: { invites: { token, email, role } },
     });
-    return successResponse(res, { token, email, role }, 201);
+    return successResponse(res, { token, email, role, emailSent: true }, 201);
   } catch (err) {
     next(err);
   }
@@ -165,6 +208,7 @@ module.exports = {
   createWorkspace,
   listMyWorkspaces,
   getWorkspace,
+  searchWorkspace,
   updateWorkspace,
   inviteMember,
   acceptInvite,

@@ -1,5 +1,5 @@
 const express = require("express");
-const { body } = require("express-validator");
+const { body, query } = require("express-validator");
 const validate = require("../middleware/validate");
 const {
   protect,
@@ -25,6 +25,14 @@ router.post(
   [body("token").isString().isLength({ min: 10 })],
   validate,
   ctrl.acceptInvite
+);
+
+router.get(
+  "/:id/search",
+  requireWorkspaceMember,
+  [query("q").isString().trim().isLength({ min: 2, max: 100 })],
+  validate,
+  ctrl.searchWorkspace
 );
 
 router.get("/:id", requireWorkspaceMember, ctrl.getWorkspace);
