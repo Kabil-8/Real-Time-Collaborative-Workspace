@@ -3,8 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "npx --yes http-server .preview -p 8080 -c-1",
-    "build": "echo 'Nothing to build in root - see frontend/ and backend/'",
-    "start": "npx --yes http-server .preview -p 8080 -c-1"
+    "dev": "npx --yes http-server dist -p 8080 -c-1",
+    "build": "mkdir -p dist && cp .preview/index.html dist/index.html",
+    "build:dev": "mkdir -p dist && cp .preview/index.html dist/index.html",
+    "start": "npx --yes http-server dist -p 8080 -c-1"
   }
 }
