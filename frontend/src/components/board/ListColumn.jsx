@@ -3,7 +3,7 @@ import { Droppable } from "@hello-pangea/dnd";
 import CardItem from "./CardItem";
 import { useBoard } from "../../context/BoardContext";
 
-export default function ListColumn({ list, cards, onOpenCard }) {
+export default function ListColumn({ list, cards, onOpenCard, listDragHandleProps }) {
   const { createCard, updateList, deleteList } = useBoard();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
@@ -33,7 +33,10 @@ export default function ListColumn({ list, cards, onOpenCard }) {
 
   return (
     <div className="flex w-72 shrink-0 flex-col rounded-lg bg-slate-100 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div
+        className="mb-2 flex items-center justify-between gap-2"
+        {...listDragHandleProps}
+      >
         {editingTitle ? (
           <input
             autoFocus

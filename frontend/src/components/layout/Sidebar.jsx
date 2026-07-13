@@ -10,10 +10,10 @@ export default function Sidebar({ onCreateWorkspace }) {
   const initial = (user?.name || "?").slice(0, 1).toUpperCase();
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="px-4 py-4 border-b border-slate-200">
-        <div className="text-lg font-semibold text-brand-700">Zaalima</div>
-        <div className="text-xs text-slate-500">Workspace</div>
+    <aside className="flex h-screen w-64 flex-col border-r border-slate-200/80 bg-white/85 backdrop-blur-xl">
+      <div className="px-5 py-5 border-b border-slate-200/80">
+        <div className="flex items-center gap-2"><div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-black text-white shadow-md">Z</div><div className="text-lg font-bold tracking-tight text-slate-900">Zaalima</div></div>
+        <div className="mt-1 text-xs text-slate-500">Agile workspace</div>
       </div>
       <div className="px-3 py-3 border-b border-slate-200">
         <div className="flex items-center justify-between mb-2">
@@ -31,9 +31,10 @@ export default function Sidebar({ onCreateWorkspace }) {
           ))}
         </select>
       </div>
-      <nav className="flex-1 px-2 py-3 space-y-1">
-        <Link to="/" className="block rounded px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">Boards</Link>
-        <Link to="/workspace/settings" className="block rounded px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">Workspace Settings</Link>
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        <Link to="/" className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700">Boards</Link>
+        <Link to="/notifications" className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700">Notifications</Link>
+        <Link to="/workspace/settings" className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-brand-50 hover:text-brand-700">Workspace Settings</Link>
       </nav>
       <div className="border-t border-slate-200 px-3 py-3">
         <div className="flex items-center gap-2">

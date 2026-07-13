@@ -4,11 +4,12 @@ import { useAuth } from "../context/AuthContext";
 
 function AuthCard({ title, children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4" style={{ backgroundImage: "radial-gradient(circle at 20% 15%, rgba(129,140,248,.28), transparent 30%), radial-gradient(circle at 85% 85%, rgba(56,189,248,.16), transparent 28%)" }}>
+      <div className="w-full max-w-md animate-scale-in rounded-2xl border border-white/80 bg-white/90 p-8 shadow-float backdrop-blur">
         <div className="mb-6">
-          <div className="text-brand-700 text-2xl font-bold">Zaalima</div>
-          <h1 className="mt-2 text-xl font-semibold">{title}</h1>
+          <div className="text-brand-700 text-2xl font-bold tracking-tight">Zaalima</div>
+          <p className="mt-1 text-sm text-slate-500">Plan together. Move work forward.</p>
+          <h1 className="mt-5 text-xl font-semibold text-slate-900">{title}</h1>
         </div>
         {children}
       </div>
@@ -45,7 +46,7 @@ export function LoginPage() {
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none" />
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <button type="submit" disabled={loading} className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+        <button type="submit" disabled={loading} className="primary-button w-full">
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
@@ -91,7 +92,7 @@ export function RegisterPage() {
           <p className="mt-1 text-xs text-slate-500">Minimum 8 characters</p>
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
-        <button type="submit" disabled={loading} className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+        <button type="submit" disabled={loading} className="primary-button w-full">
           {loading ? "Creating…" : "Create account"}
         </button>
       </form>

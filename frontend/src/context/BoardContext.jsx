@@ -81,7 +81,12 @@ export function BoardProvider({ boardId, children }) {
 
   const createList = useCallback(async (title) => {
     const res = await api.post("/boards/lists", { boardId, title });
-    setLists((prev) => [...prev, res.data.data.list]);
+    const list = res.data.data.list;
+    // The creating client also receives the Socket.io event. Whichever
+    // response arrives first must win, otherwise the list appears twice.
+    setLists((prev) => (
+      prev.some((item) => item._id === list._id) ? prev : [...prev, list]
+    ));
   }, [boardId]);
 
   const updateList = useCallback(async (listId, patch) => {
@@ -95,9 +100,41 @@ export function BoardProvider({ boardId, children }) {
     setCards((prev) => prev.filter((c) => c.listId !== listId));
   }, []);
 
+  const moveList = useCallback(async (listId, newIndex) => {
+    let previousLists = [];
+    setLists((prev) => {
+      previousLists = prev;
+      const moving = prev.find((list) => list._id === listId);
+      if (!moving) return prev;
+      const siblings = prev
+        .filter((list) => list._id !== listId)
+        .sort((a, b) => a.order - b.order);
+      const index = Math.max(0, Math.min(newIndex, siblings.length));
+      const before = index > 0 ? siblings[index - 1].order : null;
+      const after = index < siblings.length ? siblings[index].order : null;
+      const order = before == null && after == null ? 1024
+        : before == null ? after - 1024
+          : after == null ? before + 1024
+            : (before + after) / 2;
+      return [...siblings, { ...moving, order }];
+    });
+    try {
+      const res = await api.patch(`/boards/lists/${listId}/reorder`, { newIndex });
+      setLists((prev) => prev.map((list) => (
+        list._id === listId ? res.data.data.list : list
+      )));
+    } catch {
+      setLists(previousLists);
+    }
+  }, []);
+
   const createCard = useCallback(async (listId, title) => {
     const res = await api.post("/boards/cards", { listId, title });
-    setCards((prev) => [...prev, res.data.data.card]);
+    const card = res.data.data.card;
+    // See createList: REST and Socket.io can resolve in either order.
+    setCards((prev) => (
+      prev.some((item) => item._id === card._id) ? prev : [...prev, card]
+    ));
   }, []);
 
   const updateCard = useCallback(async (cardId, patch) => {
@@ -143,7 +180,7 @@ export function BoardProvider({ boardId, children }) {
     <BoardContext.Provider
       value={{
         board, lists, cards, loading, error, reload: load,
-        createList, updateList, deleteList,
+        createList, updateList, deleteList, moveList,
         createCard, updateCard, deleteCard, moveCard,
       }}
     >

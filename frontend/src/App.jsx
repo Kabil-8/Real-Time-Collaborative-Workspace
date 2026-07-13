@@ -7,6 +7,7 @@ import HomePage from "./pages/HomePage";
 import WorkspaceSettings from "./pages/WorkspaceSettings";
 import BoardPage from "./pages/BoardPage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ export default function App() {
       <Route path="/" element={<RequireAuth><AppShell><HomePage /></AppShell></RequireAuth>} />
       <Route path="/board/:boardId" element={<RequireAuth><AppShell><BoardPage /></AppShell></RequireAuth>} />
       <Route path="/workspace/settings" element={<RequireAuth><AppShell><WorkspaceSettings /></AppShell></RequireAuth>} />
+      <Route path="/notifications" element={<RequireAuth><AppShell><NotificationsPage /></AppShell></RequireAuth>} />
       <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

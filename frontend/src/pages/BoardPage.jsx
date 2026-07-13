@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DragDropContext } from "@hello-pangea/dnd";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import { BoardProvider, useBoard } from "../context/BoardContext";
 import ListColumn from "../components/board/ListColumn";
 import CardDetailModal from "../components/board/CardDetailModal";
 
 function BoardInner() {
-  const { board, lists, cards, loading, error, createList, moveCard } = useBoard();
+  const { board, lists, cards, loading, error, createList, moveCard, moveList } = useBoard();
   const [openCard, setOpenCard] = useState(null);
   const [addingList, setAddingList] = useState(false);
   const [newListTitle, setNewListTitle] = useState("");
@@ -24,9 +24,13 @@ function BoardInner() {
   const sortedLists = [...lists].sort((a, b) => a.order - b.order);
 
   function onDragEnd(result) {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, type } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    if (type === "LIST") {
+      moveList(draggableId, destination.index);
+      return;
+    }
     moveCard(draggableId, destination.droppableId, destination.index);
   }
 
@@ -43,23 +47,40 @@ function BoardInner() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-4 flex items-center gap-3">
-        <Link to="/" className="text-sm text-slate-500 hover:text-slate-800">← Boards</Link>
-        <h1 className="text-xl font-semibold">{board.name}</h1>
+      <div className="mb-6 flex items-center gap-3">
+        <Link to="/" className="rounded-lg px-2 py-1 text-sm font-medium text-slate-500 hover:bg-white hover:text-brand-700">← Boards</Link>
+        <div className="h-5 w-px bg-slate-200" />
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{board.name}</h1>
       </div>
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex flex-1 items-start gap-4 overflow-x-auto pb-4">
-          {sortedLists.map((list) => (
-            <ListColumn
-              key={list._id}
-              list={list}
-              cards={cardsByList[list._id] || []}
-              onOpenCard={setOpenCard}
-            />
-          ))}
-          <div className="w-72 shrink-0">
+        <Droppable droppableId="board-lists" direction="horizontal" type="LIST">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className="flex flex-1 items-start gap-4 overflow-x-auto pb-4"
+            >
+              {sortedLists.map((list, index) => (
+                <Draggable key={list._id} draggableId={list._id} index={index}>
+                  {(dragProvided) => (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                    >
+                      <ListColumn
+                        list={list}
+                        cards={cardsByList[list._id] || []}
+                        onOpenCard={setOpenCard}
+                        listDragHandleProps={dragProvided.dragHandleProps}
+                      />
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+              <div className="w-72 shrink-0">
             {addingList ? (
-              <form onSubmit={handleAddList} className="rounded-lg bg-slate-100 p-3">
+              <form onSubmit={handleAddList} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-soft animate-scale-in">
                 <input
                   autoFocus
                   value={newListTitle}
@@ -75,13 +96,15 @@ function BoardInner() {
             ) : (
               <button
                 onClick={() => setAddingList(true)}
-                className="w-full rounded-lg border-2 border-dashed border-slate-300 bg-white/50 p-3 text-sm text-slate-600 hover:bg-white hover:border-slate-400"
+                className="w-full rounded-2xl border-2 border-dashed border-brand-200 bg-white/60 p-4 text-sm font-medium text-slate-600 hover:border-brand-400 hover:bg-white hover:text-brand-700"
               >
                 + Add another list
               </button>
             )}
-          </div>
-        </div>
+              </div>
+            </div>
+          )}
+        </Droppable>
       </DragDropContext>
       {currentOpenCard && (
         <CardDetailModal card={currentOpenCard} onClose={() => setOpenCard(null)} />

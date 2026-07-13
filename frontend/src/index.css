@@ -3,7 +3,26 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+  background-image: radial-gradient(circle at 16% -10%, rgba(129, 140, 248, .18), transparent 30%), radial-gradient(circle at 100% 10%, rgba(56, 189, 248, .09), transparent 24%);
+}
+
+@layer base {
+  button, a, input, textarea, select { @apply transition duration-200; }
+  input, textarea, select { @apply focus:ring-4 focus:ring-indigo-100 focus:outline-none; }
+  ::selection { @apply bg-indigo-200 text-indigo-800; }
+}
+
+@layer components {
+  .surface { @apply border border-slate-200/80 bg-white/90 shadow-soft backdrop-blur; }
+  .page-enter { @apply animate-fade-up; }
+  .primary-button { @apply rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded; }
