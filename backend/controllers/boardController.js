@@ -5,6 +5,11 @@ const Workspace = require("../models/Workspace");
 const { successResponse, errorResponse } = require("../utils/response");
 const { orderBetween, needsRebalance, ORDER_STEP } = require("../utils/order");
 
+function emit(req, boardId, event, payload) {
+  const io = req.app.get("io");
+  if (io) io.to(`board:${boardId}`).emit(event, payload);
+}
+
 async function assertBoardAccess(userId, boardId) {
   const board = await Board.findById(boardId).lean();
   if (!board) return { error: { status: 404, message: "Board not found" } };
@@ -94,6 +99,7 @@ async function createList(req, res, next) {
     const last = await List.findOne({ boardId }).sort({ order: -1 }).lean();
     const order = orderBetween(last ? last.order : null, null);
     const list = await List.create({ boardId, title, order });
+    emit(req, boardId, "list:created", { list });
     return successResponse(res, { list }, 201);
   } catch (err) {
     next(err);
@@ -110,6 +116,7 @@ async function updateList(req, res, next) {
     if (title !== undefined) list.title = title;
     if (order !== undefined) list.order = order;
     await list.save();
+    emit(req, list.boardId, "list:updated", { list });
     return successResponse(res, { list });
   } catch (err) {
     next(err);
@@ -126,6 +133,7 @@ async function deleteList(req, res, next) {
       List.deleteOne({ _id: list._id }),
       Card.deleteMany({ listId: list._id }),
     ]);
+    emit(req, list.boardId, "list:deleted", { listId: String(list._id) });
     return successResponse(res, { ok: true });
   } catch (err) {
     next(err);
@@ -150,6 +158,7 @@ async function createCard(req, res, next) {
       order,
       createdBy: req.userId,
     });
+    emit(req, list.boardId, "card:created", { card });
     return successResponse(res, { card }, 201);
   } catch (err) {
     next(err);
@@ -167,6 +176,7 @@ async function updateCard(req, res, next) {
       if (req.body[key] !== undefined) card[key] = req.body[key];
     }
     await card.save();
+    emit(req, card.boardId, "card:updated", { card });
     return successResponse(res, { card });
   } catch (err) {
     next(err);
@@ -180,6 +190,7 @@ async function deleteCard(req, res, next) {
     const { error } = await assertBoardAccess(req.userId, card.boardId);
     if (error) return errorResponse(res, error.message, error.status);
     await Card.deleteOne({ _id: card._id });
+    emit(req, card.boardId, "card:deleted", { cardId: String(card._id), listId: String(card.listId) });
     return successResponse(res, { ok: true });
   } catch (err) {
     next(err);
@@ -217,7 +228,9 @@ async function moveCard(req, res, next) {
         all[i].order = (i + 1) * ORDER_STEP;
         await all[i].save();
       }
+      emit(req, card.boardId, "board:reload", {});
     }
+    emit(req, card.boardId, "card:moved", { card });
     return successResponse(res, { card });
   } catch (err) {
     next(err);
