@@ -13,6 +13,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // The API returns { error: { message } }, while older UI code reads
+    // response.data.message. Expose the canonical message in both places.
+    const apiMessage = err.response?.data?.error?.message;
+    if (apiMessage && err.response?.data) err.response.data.message = apiMessage;
     if (err.response && err.response.status === 401) {
       localStorage.removeItem("token");
       const p = window.location.pathname;

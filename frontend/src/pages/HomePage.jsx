@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import api from "../utils/api";
 import { useWorkspace } from "../context/WorkspaceContext";
 
@@ -57,10 +58,14 @@ export default function HomePage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {boards.map((b) => (
-            <div key={b._id} className="rounded-lg bg-white p-5 shadow-sm border border-slate-200 hover:shadow-md transition">
+            <Link
+              key={b._id}
+              to={`/board/${b._id}`}
+              className="block rounded-lg bg-white p-5 shadow-sm border border-slate-200 hover:shadow-md hover:border-brand-300 transition"
+            >
               <h3 className="font-semibold text-slate-900">{b.name}</h3>
               {b.description && <p className="mt-1 text-sm text-slate-500">{b.description}</p>}
-            </div>
+            </Link>
           ))}
         </div>
       )}

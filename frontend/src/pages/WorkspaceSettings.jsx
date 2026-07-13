@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import api from "../utils/api";
 import { useWorkspace } from "../context/WorkspaceContext";
 import { useAuth } from "../context/AuthContext";
@@ -16,10 +16,13 @@ export default function WorkspaceSettings() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
-  const myRole = detail?.members?.find((m) => m.userId === user?._id)?.role;
+  // Auth responses expose `id`, while workspace members use `userId`.
+  // `_id` remains as a fallback for any previously cached user object.
+  const currentUserId = user?.id || user?._id;
+  const myRole = detail?.members?.find((m) => m.userId === currentUserId)?.role;
   const isAdmin = myRole === "owner" || myRole === "admin";
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     if (!current) return;
     const wsRes = await api.get(`/workspaces/${current._id}`);
     setDetail(wsRes.data.data.workspace);
@@ -30,9 +33,9 @@ export default function WorkspaceSettings() {
     } catch {
       setInvites([]); // non-admins can't list invites
     }
-  }
+  }, [current]);
 
-  useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [current?._id]);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   if (!current) return <div className="text-slate-500">Select a workspace first.</div>;
 
@@ -138,7 +141,7 @@ export default function WorkspaceSettings() {
             <li key={m.userId} className="py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">
-                  {m.name} {m.userId === user?._id && <span className="text-xs text-slate-400">(you)</span>}
+                  {m.name} {m.userId === currentUserId && <span className="text-xs text-slate-400">(you)</span>}
                 </div>
                 <div className="text-xs text-slate-500 truncate">{m.email}</div>
               </div>
@@ -155,12 +158,12 @@ export default function WorkspaceSettings() {
                 ) : (
                   <span className="text-xs rounded bg-slate-100 px-2 py-1 text-slate-600 capitalize">{m.role}</span>
                 )}
-                {m.role !== "owner" && (isAdmin || m.userId === user?._id) && (
+                {m.role !== "owner" && (isAdmin || m.userId === currentUserId) && (
                   <button
-                    onClick={() => (m.userId === user?._id ? leaveWorkspace() : removeMember(m.userId))}
+                    onClick={() => (m.userId === currentUserId ? leaveWorkspace() : removeMember(m.userId))}
                     className="text-xs text-red-600 hover:underline"
                   >
-                    {m.userId === user?._id ? "Leave" : "Remove"}
+                    {m.userId === currentUserId ? "Leave" : "Remove"}
                   </button>
                 )}
               </div>
