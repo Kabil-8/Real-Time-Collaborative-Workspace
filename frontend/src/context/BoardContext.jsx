@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
 import api from "../utils/api";
+import { getSocket } from "../utils/socket";
 
 const BoardContext = createContext(null);
 
@@ -28,6 +29,55 @@ export function BoardProvider({ boardId, children }) {
   }, [boardId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!boardId) return;
+    const socket = getSocket();
+    const join = () => socket.emit("join-board", boardId);
+    join();
+    socket.on("connect", join);
+
+    const onListCreated = ({ list }) =>
+      setLists((prev) => (prev.some((l) => l._id === list._id) ? prev : [...prev, list]));
+    const onListUpdated = ({ list }) =>
+      setLists((prev) => prev.map((l) => (l._id === list._id ? list : l)));
+    const onListDeleted = ({ listId }) => {
+      setLists((prev) => prev.filter((l) => l._id !== listId));
+      setCards((prev) => prev.filter((c) => c.listId !== listId));
+    };
+    const onCardCreated = ({ card }) =>
+      setCards((prev) => (prev.some((c) => c._id === card._id) ? prev : [...prev, card]));
+    const onCardUpdated = ({ card }) =>
+      setCards((prev) => prev.map((c) => (c._id === card._id ? card : c)));
+    const onCardMoved = ({ card }) =>
+      setCards((prev) => prev.map((c) => (c._id === card._id ? card : c)));
+    const onCardDeleted = ({ cardId }) =>
+      setCards((prev) => prev.filter((c) => c._id !== cardId));
+    const onReload = () => load();
+
+    socket.on("list:created", onListCreated);
+    socket.on("list:updated", onListUpdated);
+    socket.on("list:deleted", onListDeleted);
+    socket.on("card:created", onCardCreated);
+    socket.on("card:updated", onCardUpdated);
+    socket.on("card:moved", onCardMoved);
+    socket.on("card:deleted", onCardDeleted);
+    socket.on("board:reload", onReload);
+
+    return () => {
+      socket.emit("leave-board", boardId);
+      socket.off("connect", join);
+      socket.off("list:created", onListCreated);
+      socket.off("list:updated", onListUpdated);
+      socket.off("list:deleted", onListDeleted);
+      socket.off("card:created", onCardCreated);
+      socket.off("card:updated", onCardUpdated);
+      socket.off("card:moved", onCardMoved);
+      socket.off("card:deleted", onCardDeleted);
+      socket.off("board:reload", onReload);
+    };
+  }, [boardId, load]);
 
   const createList = useCallback(async (title) => {
     const res = await api.post("/boards/lists", { boardId, title });
